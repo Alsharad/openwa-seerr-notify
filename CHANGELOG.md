@@ -27,6 +27,24 @@ All notable changes to this plugin are documented here. The format follows
   shows a banner with the release URL if so. Nothing is downloaded or installed. `updateCheckEnabled`
   switches the check off entirely, and "Check now" runs it on demand.
 
+### Changed — action required
+
+- **Seerr authenticates with the `Authorization Header` field now, not a custom header.** Seerr sends that
+  field verbatim, with no scheme, which is exactly what a `shared-secret` route compares — so the custom
+  header was an extra step for nothing, and the gateway does not touch `Authorization` on a `@Public()`
+  ingress route (verified against a live instance). **Existing installs: move the secret out of the custom
+  header row into Authorization Header and delete the custom header, or every delivery 401s.**
+  `send-test.mjs` moved with it.
+
+  If something in front of OpenWA rewrites or strips `Authorization`, change
+  `ingress[0].signature.header` in the manifest to a header it leaves alone.
+
+- The Setup tab is down to what you actually paste: the webhook URL, the Authorization value with a
+  Generate button, one line about the JSON payload and notification types, and a link to the full guide.
+  The instance count, the session-scope note, the "read from OpenWA at …" timestamp and the always-on
+  Refresh button are gone — the list re-reads itself when the plugin starts, and a "Check again" button
+  appears only while there is no instance to show.
+
 ### Fixed
 
 - **A fresh install could not be set up.** `onEnable` threw when no recipient was mapped, which marks the

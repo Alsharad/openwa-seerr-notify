@@ -49,7 +49,7 @@
       "maxBodyBytes": 262144,
       "signature": {
         "scheme": "shared-secret",
-        "header": "X-Seerr-Token"
+        "header": "Authorization"
       },
       "response": {
         "preflight": [

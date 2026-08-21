@@ -226,3 +226,20 @@ test('the Setup tab is the last tab, and not the one the editor opens on', () =>
   );
   assert.deepEqual(tabs.filter((t) => t[2] === 'true').map((t) => t[1]), ['connection']);
 });
+
+test('the editor names the header the manifest actually verifies', () => {
+  // Seerr has a dedicated Authorization Header field and sends it verbatim, with no scheme — which is
+  // exactly what a shared-secret route compares. Naming a custom header instead cost the operator an
+  // extra step for nothing. If the manifest ever moves back to a custom header, the editor has to move
+  // with it, or the setup instructions send people to the wrong field.
+  const manifest = JSON.parse(readFileSync(join(HERE, 'manifest.json'), 'utf8')) as {
+    ingress: Array<{ signature?: { scheme?: string; header?: string } }>;
+  };
+  const signature = manifest.ingress[0].signature;
+  assert.equal(signature?.scheme, 'shared-secret');
+  assert.equal(signature?.header, 'Authorization');
+  assert.match(html, /Authorization Header/, 'the Setup tab must name the field the operator fills in');
+
+  const rig = readFileSync(join(HERE, 'send-test.mjs'), 'utf8');
+  assert.match(rig, /Authorization: TOKEN/, 'send-test.mjs would 401 against the declared header');
+});

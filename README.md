@@ -18,12 +18,12 @@ project's [plugin standard](https://github.com/rmyndharis/OpenWA-plugins/blob/ma
 | **Requires** | OpenWA ≥ 0.8.16 (Integration SDK v1) · tested 0.23.1 |
 | **Tested against** | Jellyseerr / Seerr 3.4.1 |
 | **Permissions** | `webhook:ingress` · `conversation:send` · `net:fetch` · `storage:use` |
-| **Ingress route** | `seerr` — shared-secret header (`X-Seerr-Token`) |
+| **Ingress route** | `seerr` — shared-secret in the `Authorization` header |
 
 ## Features
 
 - **A Setup tab that does the fiddly parts** — reads the webhook URL back from the gateway so you paste
-  rather than assemble it, generates the `X-Seerr-Token` secret, and says exactly what to set in Seerr.
+  rather than assemble it, generates the secret Seerr authenticates with, and says what else to set.
 - **Tells you when there is a new release** — a daily GitHub check and a banner; nothing is downloaded,
   and it switches off in one click.
 - **Routing you control** — a clickable matrix of every Seerr `notification_type` against requester,
@@ -39,7 +39,7 @@ project's [plugin standard](https://github.com/rmyndharis/OpenWA-plugins/blob/ma
 - **Poster attached** — sent as the image caption when the message fits WhatsApp's 1024-character
   caption limit, otherwise as an uncaptioned image followed by the text.
 - **Host-side authentication** — `signature.scheme: "shared-secret"`; the host compares the
-  `X-Seerr-Token` header against the instance secret in constant time before the plugin runs, and a
+  `Authorization` header against the instance secret in constant time before the plugin runs, and a
   `session-alive` preflight answers 503 when the WhatsApp session is down.
 - **Degrades instead of dropping** — a Seerr API that is down, slow or unreachable costs the message its
   enrichment, never its delivery.
@@ -104,7 +104,8 @@ The full path:
 7. **Point Seerr at it** — Jellyseerr/Overseerr → Settings → Notifications → Webhook:
    - **Enable Agent**: on
    - **Webhook URL**: the URL from the Setup tab
-   - **Custom header**: name `X-Seerr-Token`, value the secret. Leave **Authorization Header** empty.
+   - **Authorization Header**: the secret. Seerr sends this field verbatim, with no scheme, which is
+     exactly what a `shared-secret` route compares — so no custom header is needed.
    - **JSON Payload**: leave it at Seerr's default — press **Reset to Default** if you have edited it.
      Every field the plugin reads comes from that template. Extra fields are ignored, so a template that
      only *adds* things is fine.

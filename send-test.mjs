@@ -25,7 +25,9 @@
 // records `no_recipients`. Events that route only to admins (TEST_NOTIFICATION by default) ignore it.
 //
 // Environment:
-//   SEERR_INGRESS_TOKEN  required — the instance secret, shown once when the instance was created
+//   SEERR_INGRESS_TOKEN  required — the instance secret, sent as the Authorization header exactly as
+//                        Seerr's webhook agent sends it (a bare value, no scheme). Shown once when the
+//                        instance was created
 //                        (regenerate: POST /api/integration/plugins/seerr-notify/instances/<id>/regenerate-secret)
 //   INGRESS_URL          default http://localhost:2785/api/ingress/seerr-notify/seerr-prod/seerr
 //   TMDB_ID              default 693134 (Dune: Part Two) — the title enrichment will look up
@@ -155,7 +157,7 @@ const payload = {
 
 const res = await fetch(INGRESS_URL, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'X-Seerr-Token': TOKEN },
+  headers: { 'Content-Type': 'application/json', Authorization: TOKEN },
   body: JSON.stringify(payload),
 });
 const body = await res.text();
