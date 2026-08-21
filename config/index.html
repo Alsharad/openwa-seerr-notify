@@ -467,57 +467,37 @@
 
 <section id="panel-setup" role="tabpanel" aria-labelledby="tab-setup" tabindex="0" hidden>
   <h2>Point Seerr at this plugin</h2>
-  <p class="lede">Seerr → Settings → Notifications → Webhook. Tick <b>Enable Agent</b>, fill in these two, Save.</p>
+  <p class="lede">
+    The <b>Instances</b> tab of this window holds the webhook URL and the secret, live — it creates them,
+    shows them and copies them. This page is only what to do with them, so it never disagrees with it.
+  </p>
 
   <div class="card">
-    <div id="instanceList"></div>
-    <p class="warn" id="instanceWarning" hidden></p>
-
-    <div class="rail">
-      <span class="tag" id="urlLabel">Webhook URL</span>
-      <input type="text" id="webhookUrl" readonly aria-labelledby="urlLabel"
-             spellcheck="false" translate="no" />
-      <div class="acts">
-        <button type="button" class="icon" id="copyUrl" data-icon="i-copy" aria-label="Copy the webhook URL">
-          <svg width="15" height="15" aria-hidden="true"><use href="#i-copy" /></svg>
-        </button>
-      </div>
-    </div>
-
-    <div class="rail">
-      <span class="tag" id="secretLabel">Auth Header</span>
-      <input type="password" id="ingressSecret" readonly aria-labelledby="secretLabel"
-             spellcheck="false" translate="no" placeholder="64 hex characters…" />
-      <div class="acts">
-        <button type="button" class="icon" id="revealSecret" aria-label="Show the secret" aria-pressed="false">
-          <svg width="15" height="15" aria-hidden="true"><use href="#i-eye" /></svg>
-        </button>
-        <button type="button" class="icon" id="copySecret" data-icon="i-copy" aria-label="Copy the secret">
-          <svg width="15" height="15" aria-hidden="true"><use href="#i-copy" /></svg>
-        </button>
-        <button type="button" class="icon" id="generateSecret" aria-label="Generate a new secret">
-          <svg width="15" height="15" aria-hidden="true"><use href="#i-refresh" /></svg>
-        </button>
-      </div>
-    </div>
-
-    <label class="sr-only" for="secretInstance">Instance to generate a secret for</label>
-    <select id="secretInstance" hidden></select>
-    <p class="hint" id="secretWarning" hidden>
-      Replaces the current secret — Seerr stops working until you paste the new one in. Press again to confirm.
+    <h3>1 · On the Instances tab</h3>
+    <p class="hint">
+      Create an instance if you have none: an id, and the <b>WhatsApp session to send from</b> — one with
+      no session bound delivers nothing. Copy its <b>webhook URL</b>, and the <b>secret</b> it shows when
+      you create it or regenerate one.
     </p>
+  </div>
 
-    <p class="hint" style="margin-top:10px">
-      Leave the <b>JSON Payload</b> at Seerr’s default, and tick the notification types you want.
-    </p>
+  <div class="card">
+    <h3>2 · In Seerr → Settings → Notifications → Webhook</h3>
+    <ul class="hint" style="padding-left:18px; margin:0">
+      <li><b>Enable Agent</b> — on.</li>
+      <li><b>Webhook URL</b> — the URL you copied.</li>
+      <li><b>Authorization Header</b> — the secret. Leave the custom-header rows empty.</li>
+      <li><b>JSON Payload</b> — leave it at Seerr’s default; press Reset to Default if you have edited it.</li>
+      <li>Tick the notification types you want. <b>Who gets what</b> decides who receives each one.</li>
+    </ul>
+  </div>
 
-    <div class="rail" style="margin-top:10px">
-      <span class="tag">Full guide</span>
-      <a class="rail-link" id="repoLink" href="https://github.com/Alsharad/openwa-seerr-notify#setup" rel="noopener noreferrer">
-        <span translate="no">github.com/Alsharad/openwa-seerr-notify</span>
-        <svg width="13" height="13" aria-hidden="true"><use href="#i-external" /></svg>
-      </a>
-    </div>
+  <div class="rail">
+    <span class="tag">Full guide</span>
+    <a class="rail-link" id="repoLink" href="https://github.com/Alsharad/openwa-seerr-notify#setup" rel="noopener noreferrer">
+      <span translate="no">github.com/Alsharad/openwa-seerr-notify</span>
+      <svg width="13" height="13" aria-hidden="true"><use href="#i-external" /></svg>
+    </a>
   </div>
 </section>
 
@@ -565,8 +545,6 @@
   var pending = null;
   /** Set once an install has been confirmed by the replacement worker; the banner reads it until reload. */
   var installedVersion = '';
-  /** Which ingress instance the Setup tab is showing, when there is more than one. */
-  var selectedInstance = '';
   var SETUP_POLL_MS = [2500, 5000, 9000];
   /** An install downloads a package, swaps the worker and waits for the replacement to report in. */
   var UPGRADE_POLL_MS = [2000, 3000, 4000, 6000, 8000, 10000];
@@ -874,106 +852,13 @@
   }
 
   // ── Setup ───────────────────────────────────────────────────────────────
-  function renderInstances() {
-    var list = el('instanceList');
-    var picker = el('secretInstance');
-    var instances = Array.isArray(setup.instances) ? setup.instances : [];
-    list.innerHTML = '';
-    picker.innerHTML = '';
-
-    if (instances.length === 0) {
-      // Deliberately brief. OpenWA's Instances tab owns creating these — it has the id field, the session
-      // picker and the secret-shown-once view — and duplicating its instructions here only creates two
-      // descriptions to keep in step. Name the tab and get out of the way.
-      var note = document.createElement('div');
-      note.className = 'note';
-      note.innerHTML =
-        '<b>No ingress instance yet.</b> This is the address Seerr posts to. Create one on the ' +
-        '<b>Instances</b> tab of this window, binding it to the WhatsApp session you want to send from, ' +
-        'then press Check again. The secret it shows you is the one Seerr needs, so you can skip ' +
-        'Generate below.';
-      list.appendChild(note);
-
-      var again = document.createElement('button');
-      again.type = 'button';
-      again.className = 'btn';
-      again.textContent = 'Check again';
-      again.addEventListener('click', function () {
-        requestSetup('instances', '', 'Looking for an ingress instance…');
-      });
-      list.appendChild(again);
-    }
-
-    instances.forEach(function (instance) {
-      var option = document.createElement('option');
-      option.value = instance.instanceId;
-      option.textContent = instance.instanceId;
-      picker.appendChild(option);
-    });
-
-    // With more than one instance the picker chooses which one the tab is about — its URL as well as its
-    // secret. It used to select only the secret, so a second instance's webhook URL was unreachable from
-    // here even though the panel knew it.
-    picker.hidden = instances.length < 2;
-    var wanted = selectedInstance || setup.secretFor;
-    var chosen = instances.filter(function (i) { return i.instanceId === wanted; })[0] || instances[0];
-    if (chosen) picker.value = chosen.instanceId;
-
-    // buildIngressUrls returns a bare path when the gateway has no BASE_URL — the host is the operator's
-    // to supply, and guessing it here would hand Seerr a URL that silently never connects.
-    var url = chosen ? chosen.url || '' : '';
-    var shown = !chosen ? '' : (chosen.relative ? 'http://<openwa-host>:<openwa-port>' + url : url);
-
-    el('webhookUrl').value = shown;
-    el('webhookUrl').title = shown;
-    el('copyUrl').disabled = shown === '';
-
-    // An instance with no session has nowhere to send from, so every delivery dead-letters with
-    // `no_session`. The URL and the secret both look right, which is what makes it worth saying here.
-    var unbound = !!(chosen && !chosen.sessionScope);
-    el('instanceWarning').hidden = !unbound;
-    if (unbound) {
-      el('instanceWarning').textContent =
-        'This instance is not bound to a WhatsApp session, so nothing can be delivered. Bind it on the ' +
-        'Instances tab.';
-    }
-    el('generateSecret').disabled = instances.length === 0;
-  }
-
   function renderSetup() {
-    renderInstances();
-
-    // While a new secret is being minted the OLD one is not shown at all. It is about to stop working,
-    // and the gap between pressing generate and the value landing is a few seconds — long enough to
-    // copy the previous secret into Seerr and wonder why every delivery 401s.
-    var generating = !!(pending && pending.action === 'secret');
-    var secret = generating ? '' : (typeof setup.secret === 'string' ? setup.secret : '');
-    var field = el('ingressSecret');
-    var reveal = el('revealSecret');
-    var generate = el('generateSecret');
-
-    field.value = secret;
-    field.type = 'password';
-    field.placeholder = generating ? 'generating…' : '64 hex characters…';
-    field.setAttribute('aria-busy', generating ? 'true' : 'false');
-    reveal.setAttribute('aria-pressed', 'false');
-    reveal.setAttribute('aria-label', 'Show the secret');
-    setIcon(reveal, 'i-eye');
-    reveal.disabled = secret === '';
-    el('copySecret').disabled = secret === '';
-
-    generate.setAttribute('aria-busy', generating ? 'true' : 'false');
-    generate.setAttribute('aria-label', generating ? 'Generating a new secret' : 'Generate a new secret');
-    if (generating) generate.disabled = true;
-
+    // Nothing here is read from the gateway any more. The webhook URL and the ingress secret live on
+    // OpenWA's own Instances tab, which shows them live and copies them; mirroring them into config made
+    // this page a cache that went stale the moment an instance was created, and no amount of refreshing
+    // on our side could fix that — the editor has no network, so it can only ever show what was written
+    // the last time the plugin ran. What remains is the update banner, which IS this plugin's own state.
     var update = setup.update || null;
-    // `upgradingTo` is set by the worker that starts an install and cleared by the one that replaces it,
-    // so it — not a local flag — is what says an install is in flight, even across a page reload.
-    // `update.current` is the version that was running when the CHECK ran, so after an install it is the
-    // old one — which is how the banner came to read "1.10.1 is out — you are running 1.9.0" on a 1.10.1
-    // install, while Options said 1.10.1 two inches below. `setup.version` is the running build, written
-    // on every background pass, so it is what the whole panel reads; and a release equal to it is not an
-    // update however stale the stored answer is.
     var running = setup.version || (update && update.current) || '';
     var installing = !!(setup.upgradingTo || (pending && pending.action === 'upgrade'));
     var installed = installedVersion !== '';
@@ -993,15 +878,9 @@
     el('installUpdate').hidden = !offer;
     el('installUpdateOptions').hidden = !offer;
     el('updateLink').hidden = installing || installed;
-    // textContent on an armed button wiped its icon, and nothing ever put it back. Rebuild both.
     setButtonLabel(el('installUpdate'), 'i-download', 'Install it');
     setButtonLabel(el('installUpdateOptions'), 'i-download', 'Install update');
 
-    // The same facts as the banner, in one line — so the two can never disagree.
-    // Every button here works by saving a token for the plugin to act on, and the host only forwards
-    // config changes to a plugin whose status is ENABLED. Installed-but-not-enabled therefore looks
-    // exactly like a hang, so say which it is: an empty setup.version means no background pass has ever
-    // finished, which on a running plugin is true for a few seconds at most.
     var parts = [running ? 'Version ' + running : 'Not running yet — enable the plugin on its card'];
     if (offer) parts.push(update.latest + ' available');
     else if (installed) parts.push('installed ' + installedVersion + ', reload to load it');
@@ -1279,12 +1158,6 @@
   refreshBtn.addEventListener('click', requestRefresh);
   el('routingReset').addEventListener('click', resetRouting);
 
-  el('copyUrl').addEventListener('click', function () {
-    copyText(el('webhookUrl').value, el('copyUrl'), el('webhookUrl'));
-  });
-  el('copySecret').addEventListener('click', function () {
-    copyText(el('ingressSecret').value, el('copySecret'), el('ingressSecret'));
-  });
   /** One reveal behaviour, used by both credential fields — they are the same control. */
   function bindReveal(buttonId, fieldId, noun) {
     el(buttonId).addEventListener('click', function () {
@@ -1297,7 +1170,6 @@
       setIcon(button, shown ? 'i-eye' : 'i-eye-off');
     });
   }
-  bindReveal('revealSecret', 'ingressSecret', 'secret');
   bindReveal('revealApiKey', 'seerrApiKey', 'API key');
 
   el('copyApiKey').addEventListener('click', function () {
@@ -1310,10 +1182,6 @@
     var empty = el('seerrApiKey').value === '';
     el('revealApiKey').disabled = empty;
     el('copyApiKey').disabled = empty;
-  });
-  el('secretInstance').addEventListener('change', function () {
-    selectedInstance = el('secretInstance').value;
-    renderSetup();
   });
   el('updateCheckEnabled').addEventListener('change', renderSetup);
   el('checkUpdate').addEventListener('click', function () {
@@ -1348,39 +1216,6 @@
   el('installUpdateOptions').addEventListener('click', function () { armInstall(el('installUpdateOptions')); });
   el('repoLink').addEventListener('click', function (event) { openExternal(event, el('repoLink').href); });
   el('updateLink').addEventListener('click', function (event) { openExternal(event, el('updateLink').href); });
-
-  // Two presses: generating breaks a working webhook until the new value reaches Seerr, and a sandboxed
-  // frame has no confirm() to fall back on (modals need allow-modals, which it is not given).
-  var armedInstance = null;
-  el('generateSecret').addEventListener('click', function () {
-    var button = el('generateSecret');
-    var picker = el('secretInstance');
-    var instances = Array.isArray(setup.instances) ? setup.instances : [];
-    var target = picker.hidden ? (instances[0] || {}).instanceId : picker.value;
-    if (!target) return;
-
-    if (armedInstance !== target) {
-      armedInstance = target;
-      button.classList.add('armed');
-      button.setAttribute('aria-label', 'Press again to replace the secret for ' + target);
-      el('secretWarning').hidden = false;
-      setStatus('Press ↻ again to replace the secret for ' + target + '.', false);
-      setTimeout(function () {
-        if (armedInstance !== target) return;
-        armedInstance = null;
-        button.classList.remove('armed');
-        button.setAttribute('aria-label', 'Generate a new secret');
-        el('secretWarning').hidden = true;
-      }, 10000);
-      return;
-    }
-
-    armedInstance = null;
-    button.classList.remove('armed');
-    button.setAttribute('aria-label', 'Generate a new secret');
-    el('secretWarning').hidden = true;
-    requestSetup('secret', target, 'Generating a new secret…');
-  });
 
   parent.postMessage({ type: 'config:get' }, '*');
 })();

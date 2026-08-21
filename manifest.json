@@ -1,7 +1,7 @@
 {
   "id": "seerr-notify",
   "name": "Seerr Notifications",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "type": "extension",
   "main": "dist/index.js",
   "description": "Deliver Seerr request and issue notifications over WhatsApp, formatted per recipient.",
@@ -173,7 +173,7 @@
       "setup": {
         "type": "object",
         "title": "Setup state (plugin-written)",
-        "description": "Ingress instances, the last generated ingress secret and the update check, written by the plugin for the Setup tab. Not edited by hand."
+        "description": "Written by the plugin: the running version, the release check, and a mirror of the Seerr API key so the Connection tab can show it. Not edited by hand."
       },
       "setupRequestedAt": {
         "type": "string",

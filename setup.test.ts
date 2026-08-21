@@ -1,15 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { PluginNetResponse } from './types/openwa';
-import {
-  EMPTY_SETUP,
-  discoverInstances,
-  parseSetupAction,
-  readSetup,
-  refreshSetupInBackground,
-  rotateSecret,
-  runSetupAction,
-} from './setup.ts';
+import { EMPTY_SETUP, parseSetupAction, readSetup, refreshSetupInBackground, runSetupAction } from './setup.ts';
 import type { SetupRunDeps } from './setup.ts';
 
 const NOW = () => new Date('2026-08-21T12:00:00.000Z');
@@ -70,208 +62,29 @@ function harness(routes: Record<string, { status?: number; body?: unknown }> = {
   return { deps, calls, written: () => calls.filter((c) => c.url.endsWith('/api/plugins/seerr-notify/config')) };
 }
 
-test('only the three known actions parse, and a secret action must name a legal instance', () => {
-  assert.deepEqual(parseSetupAction('instances||2026-08-21T12:00:00.000Z'), {
-    name: 'instances',
+test('only the two known actions parse', () => {
+  assert.deepEqual(parseSetupAction('update||2026-08-21T12:00:00.000Z'), {
+    name: 'update',
     arg: '',
-    token: 'instances||2026-08-21T12:00:00.000Z',
+    token: 'update||2026-08-21T12:00:00.000Z',
   });
-  assert.equal(parseSetupAction('secret|seerr-prod|t')?.arg, 'seerr-prod');
-  assert.equal(parseSetupAction('update||t')?.name, 'update');
+  assert.equal(parseSetupAction('upgrade||t')?.name, 'upgrade');
 
   assert.equal(parseSetupAction(''), null);
   assert.equal(parseSetupAction(undefined), null);
   assert.equal(parseSetupAction(42), null);
-  // An action a newer editor might introduce must do nothing rather than something arbitrary.
+  // An action a newer editor might introduce must do nothing rather than something arbitrary — and the
+  // two that were retired must not come back to life through a config written by an older one.
   assert.equal(parseSetupAction('uninstall||t'), null);
-  // The instance id goes into a URL path; the gateway's own pattern is the one enforced here.
-  assert.equal(parseSetupAction('secret||t'), null, 'a secret action with no instance is not runnable');
-  assert.equal(parseSetupAction('secret|../../etc|t'), null, 'a path-traversing instance id is rejected');
+  assert.equal(parseSetupAction('instances||t'), null, 'the Instances tab owns this now');
+  assert.equal(parseSetupAction('secret|seerr-prod|t'), null, 'so does regenerating a secret');
 });
 
 test('a malformed stored setup reads back as the empty state rather than throwing', () => {
   assert.deepEqual(readSetup(undefined), EMPTY_SETUP);
   assert.deepEqual(readSetup('nonsense'), EMPTY_SETUP);
-  assert.deepEqual(readSetup({ instances: 'not an array', secret: 7 }), EMPTY_SETUP);
-  assert.equal(readSetup({ secret: 'abc' }).secret, 'abc');
-});
-
-test('instance discovery keeps the ingress URL and flags a relative one', async () => {
-  const { deps, calls } = harness({
-    '/api/integration/plugins/seerr-notify/instances': {
-      body: [
-        instanceRow('seerr-prod', 'http://192.168.1.50:2785/api/ingress/seerr-notify/seerr-prod/seerr'),
-        instanceRow('seerr-dev', '/api/ingress/seerr-notify/seerr-dev/seerr', { sessionScope: 'sess-1', enabled: false }),
-      ],
-    },
-  });
-
-  const instances = await discoverInstances(deps);
-  assert.equal(calls[0].key, 'owa_k1_test');
-  assert.deepEqual(instances, [
-    {
-      instanceId: 'seerr-prod',
-      sessionScope: '',
-      enabled: true,
-      url: 'http://192.168.1.50:2785/api/ingress/seerr-notify/seerr-prod/seerr',
-      relative: false,
-    },
-    {
-      instanceId: 'seerr-dev',
-      sessionScope: 'sess-1',
-      enabled: false,
-      // buildIngressUrls returns a path when BASE_URL is unset; the editor prefixes it with a placeholder
-      // host rather than guessing one, so the operator cannot paste a URL that silently never connects.
-      url: '/api/ingress/seerr-notify/seerr-dev/seerr',
-      relative: true,
-    },
-  ]);
-});
-
-test('rotating a secret returns the plaintext the gateway reveals exactly once', async () => {
-  const { deps, calls } = harness({
-    'POST /api/integration/plugins/seerr-notify/instances/seerr-prod/regenerate-secret': {
-      body: { instanceId: 'seerr-prod', secret: 'f4c6918f6789215834292b55ec4e69d3' },
-    },
-  });
-
-  assert.equal(await rotateSecret(deps, 'seerr-prod'), 'f4c6918f6789215834292b55ec4e69d3');
-  assert.equal(calls[0].method, 'POST');
-});
-
-test('a masked secret is treated as a failure, not stored as the secret', async () => {
-  // Every read but the mint answers '***'. Writing that into config would leave the operator pasting
-  // three asterisks into Seerr and wondering why every delivery 401s.
-  const { deps } = harness({
-    'POST /api/integration/plugins/seerr-notify/instances/seerr-prod/regenerate-secret': { body: { secret: '***' } },
-  });
-  await assert.rejects(() => rotateSecret(deps, 'seerr-prod'), /did not reveal/);
-});
-
-test('a missing instance is reported by name', async () => {
-  const { deps } = harness({
-    'POST /api/integration/plugins/seerr-notify/instances/nope/regenerate-secret': { status: 404 },
-  });
-  await assert.rejects(() => rotateSecret(deps, 'nope'), /no ingress instance called "nope"/);
-});
-
-test('a completed action writes the result back and CLEARS its own token', async () => {
-  const { deps, written } = harness({
-    '/api/integration/plugins/seerr-notify/instances': {
-      body: [instanceRow('seerr-prod', 'http://host:2785/api/ingress/seerr-notify/seerr-prod/seerr')],
-    },
-  });
-
-  const result = await runSetupAction(deps, EMPTY_SETUP, parseSetupAction('instances||t1')!);
-  assert.equal(result.ok, true);
-  assert.equal(result.message, 'found 1 ingress instance(s)');
-
-  const body = written()[0].body as { config: Record<string, unknown> };
-  assert.deepEqual(Object.keys(body.config).sort(), ['setup', 'setupRequestedAt']);
-  // Cleared, not echoed: a stale `secret|…` token surviving in config would rotate the secret again on
-  // an unrelated restart and silently 401 Seerr. `lastAction` is what the editor reads instead.
-  assert.equal(body.config.setupRequestedAt, '');
-  assert.equal((body.config.setup as { lastAction: string }).lastAction, 'instances||t1');
-});
-
-test('an action replaces only what it owns', async () => {
-  const { deps, written } = harness({
-    '/api/integration/plugins/seerr-notify/instances': {
-      body: [instanceRow('seerr-prod', 'http://host:2785/api/ingress/seerr-notify/seerr-prod/seerr')],
-    },
-  });
-
-  const previous = {
-    ...EMPTY_SETUP,
-    secret: 'kept',
-    secretFor: 'seerr-prod',
-    update: { current: '1.6.0', latest: '1.7.0', url: 'u', checkedAt: 'earlier', available: true, note: '', asset: '', sha256: '' },
-  };
-  await runSetupAction(deps, previous, parseSetupAction('instances||t2')!);
-
-  const state = (written()[0].body as { config: { setup: Record<string, unknown> } }).config.setup;
-  assert.equal(state.secret, 'kept', 'reading the instance list must not blank the secret');
-  assert.deepEqual(state.update, previous.update, 'nor the update banner');
-});
-
-test('a failing action still writes, so the reason reaches the editor', async () => {
-  const { deps, written } = harness({ '/api/integration/plugins/seerr-notify/instances': { status: 503 } });
-
-  const result = await runSetupAction(deps, EMPTY_SETUP, parseSetupAction('instances||t3')!);
-  assert.equal(result.ok, false);
-  assert.match(result.message, /HTTP 503/);
-
-  const state = (written()[0].body as { config: { setup: { error: string } } }).config.setup;
-  assert.match(state.error, /HTTP 503/, 'an operator staring at a dead button deserves the reason in the editor');
-});
-
-test('rotating also refreshes the URL list, but a failure to list does not lose the secret', async () => {
-  const { deps, written } = harness({
-    'POST /api/integration/plugins/seerr-notify/instances/seerr-prod/regenerate-secret': { body: { secret: 'newsecret' } },
-    '/api/integration/plugins/seerr-notify/instances': { status: 500 },
-  });
-
-  const result = await runSetupAction(deps, EMPTY_SETUP, parseSetupAction('secret|seerr-prod|t4')!);
-  assert.equal(result.ok, true);
-
-  const state = (written()[0].body as { config: { setup: Record<string, unknown> } }).config.setup;
-  assert.equal(state.secret, 'newsecret');
-  assert.equal(state.secretFor, 'seerr-prod');
-  assert.equal(state.secretAt, '2026-08-21T12:00:00.000Z');
-});
-
-test('the background pass checks GitHub at most once per interval, and writes only on a change', async () => {
-  const { deps, written } = harness({
-    '/api/integration/plugins/seerr-notify/instances': {
-      body: [instanceRow('seerr-prod', 'http://host:2785/api/ingress/seerr-notify/seerr-prod/seerr')],
-    },
-  });
-  const day = 24 * 60 * 60 * 1000;
-
-  const first = await refreshSetupInBackground(deps, EMPTY_SETUP, { checkUpdates: true, intervalMs: day });
-  assert.equal(first?.update?.available, true, 'v9.9.9 against 1.6.0');
-  assert.equal(first?.instances.length, 1);
-  assert.equal(written().length, 1);
-
-  // Run again with everything already current: the check is inside its interval and the instance list is
-  // unchanged, so there is nothing to record. This pass runs on every config change now, so writing
-  // unconditionally would put a row through the gateway for every save the operator makes.
-  const current = { ...first!, update: { ...first!.update!, checkedAt: '2026-08-21T11:59:00.000Z' } };
-  const second = await refreshSetupInBackground(deps, current, { checkUpdates: true, intervalMs: day });
-  assert.equal(second, null, 'nothing changed, so nothing is written');
-  assert.equal(written().length, 1);
-
-  // A list that HAS changed is what this pass exists to catch — an instance created on OpenWA's own
-  // Instances tab, which the plugin is never told about.
-  const stale = { ...current, instances: [] };
-  const third = await refreshSetupInBackground(deps, stale, { checkUpdates: true, intervalMs: day });
-  assert.equal(third?.instances.length, 1, 'the newly created instance is picked up');
-  assert.equal(third?.update?.checkedAt, '2026-08-21T11:59:00.000Z', 'without redoing the throttled check');
-  assert.equal(written().length, 2);
-
-  const off = await refreshSetupInBackground(deps, EMPTY_SETUP, { checkUpdates: false, intervalMs: day });
-  assert.equal(off?.update, null, 'switched off means no outbound request at all');
-});
-
-test('the background pass writes nothing when it has nothing', async () => {
-  // No key file, no gateway, no update check — an install where the loopback write is unavailable must
-  // not write an empty state over whatever the operator already has. `version` already matches, so
-  // there is genuinely nothing new to record.
-  const { deps, written } = harness({ '/api/integration/plugins/seerr-notify/instances': { status: 401 } });
-  const current = { ...EMPTY_SETUP, version: '1.6.0' };
-  const state = await refreshSetupInBackground(deps, current, { checkUpdates: false, intervalMs: 1 });
-  assert.equal(state, null);
-  assert.equal(written().length, 0);
-});
-
-test('a version that has moved is written on its own', async () => {
-  // How the panel reports the running build after an upgrade, without waiting for a release check that
-  // may be switched off — or a gateway that may not answer.
-  const { deps, written } = harness({ '/api/integration/plugins/seerr-notify/instances': { status: 401 } });
-  const stale = { ...EMPTY_SETUP, version: '1.5.0' };
-  const state = await refreshSetupInBackground(deps, stale, { checkUpdates: false, intervalMs: 1 });
-  assert.equal(state?.version, '1.6.0');
-  assert.equal(written().length, 1);
+  assert.deepEqual(readSetup({ version: 7 }), EMPTY_SETUP);
+  assert.equal(readSetup({ version: '1.2.3' }).version, '1.2.3');
 });
 
 test('an install writes what it is doing BEFORE it replaces the worker doing it', async () => {
@@ -361,20 +174,6 @@ test('an upgrade clears the banner without waiting for the next daily check', as
   assert.equal(state?.update?.latest, '1.6.0', 'the fetched result is re-decided, not discarded');
   assert.equal(state?.upgradingTo, '', 'and the install marker is cleared');
   assert.equal(written().length, 1);
-});
-
-test('the marker survives until the version it names is the one running', async () => {
-  // The editor waits on exactly this pair: version === target AND the marker cleared. Clearing it early
-  // — say on any enable — would report an install finished that had not happened.
-  const { deps } = harness({ '/api/integration/plugins/seerr-notify/instances': { body: [] } });
-  const midInstall = { ...EMPTY_SETUP, version: '1.5.0', upgradingTo: '9.9.9' };
-
-  const state = await refreshSetupInBackground(deps, midInstall, { checkUpdates: false, intervalMs: 1 });
-  assert.equal(state?.version, '1.6.0', 'the running version is recorded');
-  assert.equal(state?.upgradingTo, '9.9.9', 'but 1.6.0 is not the 9.9.9 that was asked for, so the wait continues');
-
-  const arrived = await refreshSetupInBackground(deps, { ...midInstall, upgradingTo: '1.6.0' }, { checkUpdates: false, intervalMs: 1 });
-  assert.equal(arrived?.upgradingTo, '', 'the version that was asked for is now running, so the install is done');
 });
 
 test('the pre-1.13 config key names still resolve', async () => {

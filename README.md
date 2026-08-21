@@ -94,21 +94,15 @@ The full path:
    WhatsApp number.
 3. **Install and enable the plugin** (below). It enables with an empty config — there is nothing to
    configure before it is running, and the buttons that fetch things only work while it *is* running.
-4. **Create an ingress instance**, if you have not got one. This is the address Seerr posts to, and
-   nothing works without one. **Configure → Instances → Create**: give it an id (`seerr-prod` is fine),
-   **bind it to the WhatsApp session you want to send from**, and it shows you the secret once — that is
-   the secret Seerr needs, so keeping it saves you a step later.
-
-   An instance with no session bound passes every check here and then fails every delivery with
-   `no_session`, so the Setup tab says so when it sees one.
-
+4. **Create an ingress instance** on **Configure → Instances → Create**: an id (`seerr-prod` is fine),
+   and **the WhatsApp session to send from** — an instance bound to no session delivers nothing. It shows
+   the secret once; keep it. That tab is also where you copy the webhook URL and regenerate a secret
+   later, and it always shows the live values.
 5. **Open Configure → Connection**, fill in the Seerr URL and API key, and Save. Both are required. Use
    the health-check button on the plugin row to confirm — it reports the Seerr version and whether the
    key was accepted, and it works before any recipient exists.
-6. **Configure → Setup** now shows the webhook URL to paste into Seerr. If you did not keep the secret
-   from step 4, press **Generate a new secret** (twice — it asks) and copy the value that appears a
-   second later — masked by default, with reveal, copy and regenerate icons, the same way Seerr shows
-   its own API key.
+6. **Configure → Setup** is a short reminder of what to paste where; the values themselves live on the
+   Instances tab, since that is what owns them.
 7. **Point Seerr at it** — Seerr → Settings → Notifications → Webhook:
    - **Enable Agent**: on
    - **Webhook URL**: the URL from the Setup tab
@@ -271,24 +265,24 @@ are listed because they are what the REST API and any backup will show you.
 | `seerrRoster` | no | `[]` | Cached Seerr accounts (`{ id, name, email, isAdmin }`) so the editor can list them. Written by the Refresh button or `refresh-roster.mjs`. |
 | `rosterSyncedAt` | no | `""` | ISO timestamp of the last roster refresh. |
 | `rosterRefreshRequestedAt` | no | `""` | Token stamped by the Refresh button; changing it is what asks the plugin to refetch. Not edited by hand. |
-| `setup` | no | `{}` | Written by the plugin for the **Setup** tab: the ingress instances and their URLs, the last generated ingress secret, and the update check. Not edited by hand — but see the note below about the secret. |
-| `setupRequestedAt` | no | `""` | Token stamped by a Setup button as `<action>\|<arg>\|<timestamp>`, and cleared by the plugin once the action has run. Not edited by hand. |
+| `setup` | no | `{}` | Written by the plugin: the running version, the release check, and a mirror of the Seerr API key so the Connection tab can show it. Not edited by hand. No ingress URL or ingress secret — those live on OpenWA's Instances tab, which shows them live. |
+| `setupRequestedAt` | no | `""` | Token stamped by **Check for updates** or **Install it** as `<action>\|<arg>\|<timestamp>`, and cleared by the plugin once the action has run. Not edited by hand. |
 | `updateCheckEnabled` | no | `true` | Ask `api.github.com` for the latest release once a day, and show a banner when it is newer than the running build. Nothing is ever downloaded or installed. Off = no outbound request is made at all. The check also runs on demand from **Options → Check now**. |
 | `debug` | no | `false` | One gateway log line per delivery: event type, resolved recipient count, chat ids masked to their last four digits, and each send's outcome. Message bodies are never logged at any level. Shown in the panel as **Verbose logging**. |
 
-### Both credentials are readable in `setup`
+### The Seerr API key is readable in `setup`
 
-`setup.secret` holds the plaintext ingress secret from the last **Generate**, and `setup.seerrApiKey`
-mirrors your Seerr API key. Both are deliberate, and both exist for the same reason: a field flagged
+`setup.seerrApiKey` mirrors your Seerr API key so the Connection tab can show it. A field flagged
 `secret` in the schema reaches the config screen as `***`, so a panel can only ever display a credential
-the plugin puts somewhere unredacted. Without the mirror the API key field showed three asterisks, then
-an empty box — neither of which is a control you can use.
+the plugin puts somewhere unredacted — without the mirror that field showed three asterisks, and then an
+empty box.
 
-What that costs: an ADMIN, unscoped API key reading `GET /plugins` sees both values in the clear.
-Everything that can read them could already do more than read them — that key class can rotate the
-ingress secret, rewrite the config, or uninstall the plugin — and Seerr stores its own copy of the API key
-in the clear regardless. If you would rather it did not, delete `mirrorSeerrKey` from `index.ts`; the
-field falls back to the empty-with-sentinel behaviour, which still saves correctly.
+What it costs: an ADMIN, unscoped API key reading `GET /plugins` sees the value in the clear. Everything
+that can read it could already do more than read it — that key class can rewrite the config or uninstall
+the plugin — and Seerr stores its own copy in the clear regardless. If you would rather it did not,
+delete `mirrorSeerrKey` from `index.ts`; the field falls back to an empty box that still saves correctly.
+
+The **ingress secret is not stored here at all** — OpenWA's Instances tab owns it.
 
 Every **Now Available** section — overview, rating, runtime, genres, director/creator, top cast, trailer,
 seasons, collection — is always on. These were nine separate toggles until v1.2.0; that was more
@@ -350,10 +344,10 @@ restart. Nothing is cached across deliveries.
   WhatsApp messages. Control characters are stripped and every field is length-capped, but the content
   itself is whoever wrote it in Seerr.
 - **The poster URL is fetched by the host**, through the same SSRF guard as any other media send.
-- **Both credentials are readable through the API.** The Seerr API key and the last generated ingress
-  secret are mirrored into the `setup` config object so the settings panel can display them — see *Both
-  credentials are readable in `setup`* for why, what it costs, and the one function to delete if you
-  disagree. Neither is ever logged.
+- **The Seerr API key is readable through the API.** It is mirrored into the `setup` config object so the
+  Connection tab can display it — see *The Seerr API key is readable in `setup`* for why, what it costs,
+  and the one function to delete if you disagree. It is never logged. The ingress secret is not stored by
+  this plugin at all.
 - **Secrets in logs**: chat ids are masked to their last four digits, and message bodies are never
   logged, at any log level.
 - **The worker is crash containment, not a security boundary** — as OpenWA's own docs state. Plugin code

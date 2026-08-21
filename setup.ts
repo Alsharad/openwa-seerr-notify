@@ -24,29 +24,12 @@ import { checkForUpdate, isNewer, pinnedDownloadUrl } from './update-check.ts';
 import type { UpdateState } from './update-check.ts';
 import type { NetFetch } from './seerr-client.ts';
 
-/** The ingress route this plugin claims; the manifest declares exactly one. */
-const ROUTE = 'seerr';
-
-export interface SetupInstance {
-  instanceId: string;
-  /** Session the instance is bound to, or '' for all sessions. */
-  sessionScope: string;
-  enabled: boolean;
-  /** Full ingress URL, or a path when the gateway has no BASE_URL set. */
-  url: string;
-  /** True when `url` is a bare path the operator must prefix with their own OpenWA host. */
-  relative: boolean;
-}
 
 /** Everything the plugin writes for the Setup tab. Written whole, so callers merge before writing. */
 export interface SetupState {
   /** The running plugin version. Written on every pass, so the panel can state it even when the update
    *  check has never run — or has been switched off. */
   version: string;
-  instances: SetupInstance[];
-  instancesAt: string;
-  /** Plaintext ingress secret from the last rotation, until the operator clears it. */
-  secret: string;
   /**
    * The Seerr API key, mirrored so the Connection tab can show it.
    *
@@ -58,9 +41,6 @@ export interface SetupState {
    * special case with its own rules.
    */
   seerrApiKey: string;
-  /** Which instance `secret` belongs to. */
-  secretFor: string;
-  secretAt: string;
   update: UpdateState | null;
   /** Version an install was started for, so the panel can say what is being installed. */
   upgradingTo: string;
@@ -72,12 +52,7 @@ export interface SetupState {
 
 export const EMPTY_SETUP: SetupState = {
   version: '',
-  instances: [],
-  instancesAt: '',
-  secret: '',
   seerrApiKey: '',
-  secretFor: '',
-  secretAt: '',
   update: null,
   upgradingTo: '',
   lastAction: '',
@@ -90,12 +65,7 @@ export function readSetup(raw: unknown): SetupState {
   const str = (v: unknown): string => (typeof v === 'string' ? v : '');
   return {
     version: str(row.version),
-    instances: Array.isArray(row.instances) ? (row.instances as SetupInstance[]) : [],
-    instancesAt: str(row.instancesAt),
-    secret: str(row.secret),
     seerrApiKey: str(row.seerrApiKey),
-    secretFor: str(row.secretFor),
-    secretAt: str(row.secretAt),
     update: (row.update ?? null) as UpdateState | null,
     upgradingTo: str(row.upgradingTo),
     lastAction: str(row.lastAction),
@@ -104,7 +74,7 @@ export function readSetup(raw: unknown): SetupState {
 }
 
 export interface SetupAction {
-  name: 'instances' | 'secret' | 'update' | 'upgrade';
+  name: 'update' | 'upgrade';
   /** The instance id, for `secret`. Empty otherwise. */
   arg: string;
   /** The whole token, echoed back so the write cannot loop and the editor can confirm the round trip. */
@@ -121,56 +91,11 @@ export interface SetupAction {
 export function parseSetupAction(raw: unknown): SetupAction | null {
   if (typeof raw !== 'string' || raw === '') return null;
   const [name, arg = ''] = raw.split('|');
-  if (name !== 'instances' && name !== 'secret' && name !== 'update' && name !== 'upgrade') return null;
-  if (name === 'secret' && !/^[a-zA-Z0-9_-]{1,64}$/.test(arg)) return null;
+  if (name !== 'update' && name !== 'upgrade') return null;
   return { name, arg, token: raw };
 }
 
-/** This plugin's ingress instances, newest-visible-first as the gateway returns them. */
-export async function discoverInstances(deps: GatewayDeps): Promise<SetupInstance[]> {
-  const res = await gatewayRequest(deps, `/api/integration/plugins/${deps.pluginId}/instances`);
-  if (!res.ok) throw new Error(`the gateway answered HTTP ${res.status} for the instance list`);
 
-  const rows = JSON.parse(res.body) as Array<Record<string, unknown>>;
-  if (!Array.isArray(rows)) throw new Error('the gateway returned an unexpected instance list');
-
-  return rows.map((row) => {
-    const urls = Array.isArray(row.ingressUrls) ? (row.ingressUrls as Array<Record<string, unknown>>) : [];
-    const match = urls.find((u) => u.route === ROUTE) ?? urls[0];
-    const url = typeof match?.url === 'string' ? match.url : '';
-    return {
-      instanceId: String(row.instanceId ?? ''),
-      sessionScope: typeof row.sessionScope === 'string' ? row.sessionScope : '',
-      enabled: row.enabled !== false,
-      url,
-      // buildIngressUrls returns a bare path when BASE_URL is unset — the operator has to supply the host.
-      relative: url.startsWith('/'),
-    };
-  });
-}
-
-/**
- * Rotate an instance's ingress secret and return the new plaintext.
- *
- * This BREAKS the running webhook until the new value is pasted into Seerr — the old secret stops
- * verifying the moment this returns, and Seerr starts getting 401s. The editor says so before the
- * operator commits to it; there is no way to read the existing secret back instead, because the gateway
- * masks it on every read but the one that mints it.
- */
-export async function rotateSecret(deps: GatewayDeps, instanceId: string): Promise<string> {
-  const res = await gatewayRequest(
-    deps,
-    `/api/integration/plugins/${deps.pluginId}/instances/${encodeURIComponent(instanceId)}/regenerate-secret`,
-    { method: 'POST' },
-  );
-  if (res.status === 404) throw new Error(`there is no ingress instance called "${instanceId}"`);
-  if (!res.ok) throw new Error(`the gateway answered HTTP ${res.status} when rotating the secret`);
-
-  const body = JSON.parse(res.body) as { secret?: unknown };
-  const secret = typeof body.secret === 'string' ? body.secret : '';
-  if (!secret || secret === '***') throw new Error('the gateway did not reveal the new secret');
-  return secret;
-}
 
 export interface SetupRunDeps extends GatewayDeps {
   /** ctx.net.fetch — SSRF-guarded, scoped to the manifest net.allow list (api.github.com). */
@@ -206,20 +131,7 @@ export async function runSetupAction(
   let message = '';
 
   try {
-    if (action.name === 'instances') {
-      state.instances = await discoverInstances(deps);
-      state.instancesAt = now().toISOString();
-      message = `found ${state.instances.length} ingress instance(s)`;
-    } else if (action.name === 'secret') {
-      state.secret = await rotateSecret(deps, action.arg);
-      state.secretFor = action.arg;
-      state.secretAt = now().toISOString();
-      // The URL cannot change under a rotation, but a first-time operator clicks these in either order;
-      // refreshing here means the tab is never half-populated. A failure to list is not a failure to
-      // rotate, so it is swallowed.
-      state.instances = await discoverInstances(deps).catch(() => state.instances);
-      message = `rotated the ingress secret for "${action.arg}"`;
-    } else if (action.name === 'upgrade') {
+    if (action.name === 'upgrade') {
       return await installUpdate(deps, state, action);
     } else {
       state.update = await checkForUpdate(deps.netFetch, deps.repoSlug, deps.version, now);
@@ -353,18 +265,6 @@ export async function refreshSetupInBackground(
     changed = true;
   }
 
-  try {
-    const instances = await discoverInstances(deps);
-    // Only a real difference is worth a write. This runs on every config change as well as on enable, so
-    // writing unconditionally would put a row through the gateway for every save.
-    if (JSON.stringify(instances) !== JSON.stringify(previous.instances)) {
-      state.instances = instances;
-      state.instancesAt = now().toISOString();
-      changed = true;
-    }
-  } catch {
-    // Loopback or the key file is unavailable — the Setup tab's Check again button reports it properly.
-  }
 
   const lastCheck = Date.parse(previous.update?.checkedAt ?? '');
   const due = !Number.isFinite(lastCheck) || now().getTime() - lastCheck >= opts.intervalMs;

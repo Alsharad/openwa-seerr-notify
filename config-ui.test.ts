@@ -165,7 +165,7 @@ test('the Setup buttons stamp tokens the plugin actually acts on', () => {
   // The editor's only channel to the plugin is a token string in config. Both halves are written by
   // hand, in different languages, and neither compiler sees the other — so assert them against each other.
   const actions = [...html.matchAll(/requestSetup\('([^']+)'/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(actions)].sort(), ['instances', 'secret', 'update', 'upgrade']);
+  assert.deepEqual([...new Set(actions)].sort(), ['update', 'upgrade']);
 
   const stamp = /setupToken = action \+ '\|' \+ \(arg \|\| ''\) \+ '\|' \+ new Date\(\).toISOString\(\)/.test(html);
   assert.ok(stamp, 'the token format changed; parseSetupAction has to change with it');
@@ -242,8 +242,7 @@ test('the editor names the header the manifest actually verifies', () => {
   const signature = manifest.ingress[0].signature;
   assert.equal(signature?.scheme, 'shared-secret');
   assert.equal(signature?.header, 'Authorization');
-  // The tag is abbreviated to fit the rail; the guide spells the Seerr field out in full.
-  assert.match(html, /Auth Header/, 'the Setup tab must name the field the operator fills in');
+  assert.match(html, /Authorization Header/, 'the Setup tab must name the field the operator fills in');
 
   const rig = readFileSync(join(HERE, 'send-test.mjs'), 'utf8');
   assert.match(rig, /Authorization: TOKEN/, 'send-test.mjs would 401 against the declared header');
@@ -290,34 +289,12 @@ test('the icon sheet has no unused symbols and no missing ones', () => {
   assert.deepEqual([...defined].filter((name) => !used.has(name)), [], 'icon defined but never used');
 });
 
-test('a secret being replaced is never left on screen to be copied', () => {
-  // The gap between pressing generate and the new value landing is a few seconds. Showing the old
-  // secret through that gap is not a cosmetic problem: it is long enough to copy a credential that is
-  // about to stop working into Seerr, and the failure shows up later as 401s on every delivery.
-  const render = /function renderSetup\(\) \{([\s\S]*?)\n  \}/.exec(html);
-  assert.ok(render, 'could not find renderSetup in the editor');
-  assert.match(
-    render[1],
-    /generating\s*\?\s*''\s*:/,
-    'renderSetup must blank the secret while one is being generated, not re-show the previous value',
-  );
-  assert.match(render[1], /pending && pending\.action === 'secret'/, 'the busy state must key off the in-flight action');
-
-  // The repaint has to happen at both ends: on press (so the stale value goes immediately) and when the
-  // action settles (so success reveals the new secret, and failure restores the old one).
-  const request = /function requestPlugin\([\s\S]*?\n  \}/.exec(html);
-  const finish = /function finishSetup\(\) \{[\s\S]*?\n  \}/.exec(html);
-  assert.ok(request && finish, 'could not find the request/finish pair that starts and ends a wait');
-  assert.match(request[0], /renderSetup\(\);/);
-  assert.match(finish[0], /renderSetup\(\);/);
-});
-
 test('every button that waits on the plugin waits the same way', () => {
   // The roster refresh used to run its own path and tell the operator to reload the page, while the
   // Setup buttons repainted themselves. One mechanism, one signal (`setup.lastAction`), one repaint.
   const starts = [...html.matchAll(/requestPlugin\(([^,]+), '([a-z]+)'/g)].map((m) => m[2]);
   const viaSetup = [...html.matchAll(/requestSetup\('([a-z]+)'/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(starts.concat(viaSetup))].sort(), ['instances', 'roster', 'secret', 'update', 'upgrade']);
+  assert.deepEqual([...new Set(starts.concat(viaSetup))].sort(), ['roster', 'update', 'upgrade']);
 
   // The plugin has to echo the roster token the same way it echoes a Setup token, or the editor waits
   // for a signal that never comes and falls back to "reload the dashboard".
@@ -348,19 +325,18 @@ test('the API key is shown from the mirror, and never wiped when it is not', () 
   assert.match(plugin, /if \(previous\.seerrApiKey === stored\) return;/, 'the mirror must stop when it agrees');
 });
 
-test('both credentials are the same control', () => {
-  // The complaint that produced this: the Setup tab had a rail with reveal and copy, and Connection had
-  // a bare input, so the two credentials of the same plugin looked like two different products.
+test('every value the operator types or copies is a rail', () => {
+  // The complaint that produced this: one tab had a rail with reveal and copy, another had a bare input,
+  // so the same product looked like two. Only the Connection tab holds credentials now — the ingress
+  // secret belongs to OpenWA's Instances tab — but the rule is the same for whatever is here.
   const markup = html.split('<script>')[0];
   const script = html.split('<script>')[1];
 
-  for (const id of ['seerrUrl', 'seerrApiKey', 'ingressSecret', 'webhookUrl']) {
-    const field = new RegExp(`<div class="rail">[\\s\\S]{0,600}?id="${id}"`);
-    assert.match(markup, field, `${id} must sit in a rail like every other machine value`);
+  for (const id of ['seerrUrl', 'seerrApiKey', 'userFilter']) {
+    assert.match(markup, new RegExp(`<div class="rail">[\\s\\S]{0,600}?id="${id}"`), `${id} must sit in a rail`);
   }
-  // One reveal implementation, bound twice — not two that can drift apart.
+  // One reveal implementation, so a second credential field cannot drift away from the first.
   assert.match(script, /function bindReveal\(/);
-  assert.match(script, /bindReveal\('revealSecret', 'ingressSecret', 'secret'\);/);
   assert.match(script, /bindReveal\('revealApiKey', 'seerrApiKey', 'API key'\);/);
 });
 
@@ -402,20 +378,6 @@ test('hiding an element actually hides it, whatever its class sets', () => {
   assert.deepEqual(patches, ['[hidden]'], 'a per-component [hidden] patch means the global rule is being worked around');
 });
 
-test('the instance picker chooses the URL, not just the secret', () => {
-  // The instance id is a path segment in the webhook URL, so with two instances the panel has two URLs
-  // to offer. It used to show the first one and let the picker select only which instance got a new
-  // secret — leaving the second instance's URL unreachable from a panel that already knew it.
-  const script = html.split('<script>')[1];
-  assert.match(script, /var wanted = selectedInstance \|\| setup\.secretFor;/);
-  assert.match(
-    script,
-    /var chosen = instances\.filter\(function \(i\) \{ return i\.instanceId === wanted; \}\)\[0\] \|\| instances\[0\];/,
-    'the shown URL must follow the picked instance',
-  );
-  assert.match(script, /el\('secretInstance'\)\.addEventListener\('change'/, 'picking must repaint');
-});
-
 test('a plugin that is not enabled is named as the cause, not reported as a hang', () => {
   // Every button in this panel saves a token for the plugin to act on, and the host only forwards config
   // changes to a plugin whose status is ENABLED (plugin-lifecycle.ts). So installed-but-not-enabled looks
@@ -438,13 +400,18 @@ test('saving is never gated or answered as a failure', () => {
   assert.doesNotMatch(handler[0], /setStatus\([^)]*, false\)/, 'a completed save must not answer in red');
 });
 
-test('the no-instance state points at the tab that creates one', () => {
-  // OpenWA's own Instances tab creates these with a form — id, session, secret shown once. Handing the
-  // operator a curl command with an admin API key instead, two tabs away from the button, is how a
-  // first-time user got stuck on "No ingress instance yet".
-  const script = html.split('<script>')[1];
-  const empty = /No ingress instance yet[\s\S]{0,400}?';/.exec(script);
-  assert.ok(empty, 'could not find the empty-instance message');
-  assert.match(empty[0], /<b>Instances<\/b> tab/, 'name the tab that does it');
-  assert.match(empty[0], /session/, 'creating one needs a session, and the form asks for it');
+
+test('the Setup tab is a static guide, not a mirror of the Instances tab', () => {
+  // OpenWA's Instances tab creates instances, shows the ingress URL and secret live, and copies them.
+  // Reproducing any of that here made a cache that went stale the moment an instance was created — and
+  // the editor has no network, so it could never refresh itself on open. The page defers instead.
+  const markup = html.split('<script>')[0];
+  const panel = /<section id="panel-setup"[\s\S]*?<\/section>/.exec(markup);
+  assert.ok(panel, 'could not find the Setup panel');
+
+  assert.match(panel[0], /<b>Instances<\/b> tab/, 'it must name the tab that owns this');
+  assert.match(panel[0], /Authorization Header/, 'and what to paste the secret into');
+  for (const gone of ['webhookUrl', 'ingressSecret', 'generateSecret', 'instanceList', 'curl']) {
+    assert.doesNotMatch(panel[0], new RegExp(gone), `${gone} belongs to the Instances tab, not here`);
+  }
 });

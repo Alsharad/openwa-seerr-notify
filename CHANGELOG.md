@@ -22,6 +22,31 @@ All notable changes to this plugin are documented here. The format follows
 - Removed the instruction to reload the page after Refresh from Seerr; the list has repainted in place
   since 1.9.0. Host placeholders read `<openwa-host>:<openwa-port>` everywhere, matching the panel.
 
+## [1.17.0] — 2026-08-21
+
+### Removed
+
+- **The Setup tab no longer mirrors the Instances tab.** It showed the webhook URL, the ingress secret and
+  a generate button — all of which OpenWA's own **Instances** tab already shows *live*, with copy buttons,
+  a session picker and a regenerate action. Mirroring them made a cache, and a cache in this panel can
+  never be right: the config editor is a sandboxed iframe with no network, so it can only ever display
+  what the plugin wrote the last time it ran. Creating an instance left the page stale through browser
+  reloads, and no amount of refreshing on this side could have fixed it.
+
+  Setup is now a static guide — where to get the URL and secret, and exactly what to paste where in Seerr.
+  Nothing on it can go out of date, and nothing on it has to be kept in step with a tab this plugin does
+  not control.
+
+  Gone with it: `discoverInstances`, `rotateSecret`, the `instances` and `secret` actions, and the
+  `instances` / `instancesAt` / `secret` / `secretFor` / `secretAt` config state. **The plugin no longer
+  stores your ingress secret anywhere** — one fewer credential in config, and one fewer thing to justify
+  in Security.
+
+### Changed
+
+- The update banner and the release check stay, because that state is genuinely this plugin's own and has
+  nowhere else to live.
+
 ## [1.16.0] — 2026-08-21
 
 ### Changed
