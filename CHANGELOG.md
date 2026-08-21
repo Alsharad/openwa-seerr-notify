@@ -6,6 +6,46 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-08-21
+
+### Fixed
+
+- **Deliveries no longer die when the ingress instance names no session.** The plugin now resolves the
+  sending session per delivery: the instance's binding is used when it has one, and otherwise the single
+  connected session is. This is the failure that let a fully configured install dead-letter every
+  notification as `no_session` while the health check stayed green.
+
+  The binding is close to unsettable from the dashboard, which is why an unbound instance is the normal
+  state rather than an unlucky one: the field is free text labelled *"Session scope (optional)"* with the
+  placeholder *"Leave blank for all sessions"*, it is stored verbatim with no lookup, and the Sessions
+  page shows only `session.id.substring(0, 12)` with no copy control — so the id an operator would paste
+  is not obtainable from the UI at all.
+
+  The fallback applies **only when exactly one session is ready**, which is what makes it a determination
+  and not a guess: with one ready session there is no other session it could have meant. A binding to a
+  ready session always wins; a binding to a session that exists but is not ready fails and says why,
+  rather than silently sending from a different one; two or more ready sessions with no binding fails and
+  names them. This reverses a deliberate decision from an earlier release — the reasoning then was that
+  the host already answers this question, and the half of it that held up (never contradict the instance)
+  is preserved exactly.
+
+- **A binding to a deleted session recovers instead of rotting.** Re-pairing a WhatsApp session mints a
+  new id, which silently invalidates a stored binding. That case now falls back and logs every time it
+  does, since it only works while one session is connected.
+
+### Added
+
+- The health check reports which session deliveries will go out from, and fails when an instance cannot
+  send at all — no ingress instance, no connected session, or an ambiguity needing a binding. Previously
+  it looked only at the Seerr connection, so the whole outbound half was invisible.
+
+### Documentation
+
+- **Setup** no longer tells operators to bind a session, which was advice the UI could not carry out. It
+  says to leave **Session scope** blank instead.
+- New README section, **Which session sends**, covering the resolution order and each failure.
+
+
 ### Documentation
 
 - Repository hygiene, no behaviour change: `package.json` carries `repository` / `homepage` / `bugs` /

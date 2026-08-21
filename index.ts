@@ -1,6 +1,7 @@
 import type { IPlugin, PluginContext } from './types/openwa';
 import { readConfig, readSeerrConnection } from './config.ts';
 import { handleSeerrWebhook } from './handler.ts';
+import { describeSending, resolveSessionId } from './session-resolve.ts';
 import { readDeadLetters } from './deadletter.ts';
 import { probeSeerr } from './probe.ts';
 import { API_KEY_FILE_CANDIDATES, refreshRoster } from './roster-refresh.ts';
@@ -116,6 +117,16 @@ export default class SeerrNotifyPlugin implements IPlugin {
           storage: ctx.storage,
           log: (message, meta) => ctx.logger.warn(message, meta),
           sleep,
+          resolveSession: (bound) =>
+            resolveSessionId(
+              {
+                selfFetch: (target, init) => fetch(target, init as RequestInit),
+                readApiKey: readGatewayApiKey,
+                selfUrl: gatewaySelfUrl(),
+                pluginId: ctx.pluginId,
+              },
+              bound,
+            ),
         },
         req,
       );
@@ -366,6 +377,19 @@ export default class SeerrNotifyPlugin implements IPlugin {
       });
       notes.push(probe.message);
       if (!probe.ok) healthy = false;
+    }
+
+    // Only when the connection is sound: an operator whose Seerr is unreachable has one problem to fix,
+    // and the send-side note would be a second thing to read before the first is even true.
+    if (healthy) {
+      const sending = await describeSending({
+        selfFetch: (target, init) => fetch(target, init as RequestInit),
+        readApiKey: readGatewayApiKey,
+        selfUrl: gatewaySelfUrl(),
+        pluginId: ctx.pluginId,
+      });
+      notes.push(sending.note);
+      if (!sending.ok) healthy = false;
     }
 
     // Only when the connection is sound. Someone whose Seerr is unreachable has one problem to solve,

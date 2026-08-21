@@ -28,6 +28,7 @@ import { partToEnvelope, planSends, sendWithRetry } from './deliver.ts';
 import type { SendDeps } from './deliver.ts';
 import { recordDeadLetter } from './deadletter.ts';
 import type { DeadLetterDeps } from './deadletter.ts';
+import type { SessionChoice } from './session-resolve.ts';
 
 /** Event types that carry a poster worth attaching. Elsewhere the image adds nothing. */
 const POSTER_TYPES = new Set(['MEDIA_AVAILABLE', 'MEDIA_PENDING']);
@@ -39,6 +40,8 @@ export interface HandlerDeps {
   storage: Pick<PluginStorage, 'get' | 'set'>;
   log: (message: string, meta?: Record<string, unknown>) => void;
   sleep: (ms: number) => Promise<void>;
+  /** Decides which session this delivery sends from — see session-resolve.ts. */
+  resolveSession: (bound: string | undefined) => Promise<SessionChoice>;
   now?: () => string;
 }
 
@@ -164,19 +167,32 @@ export async function handleSeerrWebhook(deps: HandlerDeps, req: WebhookRequest)
 
   const event = normalizePayload(validated.value);
 
-  // Which session to send from is the host's to decide: bind the ingress instance to one (Configure →
-  // Instances). A plugin-side fallback was a second answer to a question the host already answers, and
-  // silently sending from a different session than the instance names is worse than failing here.
-  const sessionId = req.sessionId;
-  if (!sessionId) {
+  // Which session to send from is the host's to decide, and when the ingress instance names one that
+  // answer is used unchanged. It is resolved rather than read because the host cannot always answer:
+  // see the header of session-resolve.ts for why an unbound instance is the normal outcome, and why
+  // falling back is safe only when exactly one session is ready.
+  const choice = await deps.resolveSession(req.sessionId);
+  if (!choice.ok) {
     await recordDeadLetter(deadLetterDeps(deps), {
       reason: 'no_session',
       eventType: event.notificationType,
       deliveryId: req.deliveryId,
-      detail: 'the ingress instance is not bound to a WhatsApp session — bind it under Configure > Instances',
+      detail: choice.detail,
     });
-    deps.log('seerr-notify: no session to send from', { deliveryId: req.deliveryId });
+    deps.log('seerr-notify: no session to send from', { deliveryId: req.deliveryId, detail: choice.detail });
     return;
+  }
+  const sessionId = choice.sessionId;
+
+  // A binding that points at a session which no longer exists still works — but it works by accident of
+  // there being only one alternative, and it will stop the moment a second session is paired. Say so
+  // every time rather than once, because nothing else will.
+  if (choice.stale) {
+    deps.log('seerr-notify: the bound session no longer exists — sending from the only connected one', {
+      deliveryId: req.deliveryId,
+      boundTo: req.sessionId,
+      sendingFrom: sessionId,
+    });
   }
 
   debug(deps, 'seerr-notify: inbound delivery', {

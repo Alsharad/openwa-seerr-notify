@@ -69,14 +69,28 @@ test('the verdict follows the Seerr connection', async () => {
   assert.match(rejectedKey.message ?? '', /API key was rejected/);
 });
 
-test('a fully configured plugin reports the version and nothing else', async () => {
+test('a fully configured plugin leads with the version and adds no unrelated complaint', async () => {
   const health = await healthOf({
     ...connected,
     users: [{ seerrUserId: 1, number: '15550000001', enabled: true }],
     seerrRoster: [{ id: 1, name: 'Someone', email: 'a@b.c', isAdmin: true }],
   });
   assert.equal(health.healthy, true);
-  assert.equal(health.message, 'Seerr v3.4.1');
+  assert.ok(health.message?.startsWith('Seerr v3.4.1'), health.message);
+  assert.doesNotMatch(health.message ?? '', /recipients/i, 'a working install gets no advice it did not ask for');
+});
+
+test('a gateway this plugin cannot query costs a note, never the verdict', async () => {
+  // Off-host there is no admin key to read, so the send-side check cannot run. It reports the blind spot
+  // rather than inventing a verdict: the delivery path has its own fallbacks and may be perfectly fine,
+  // and a health check that failed on its own inability to look would be worse than useless.
+  const health = await healthOf({
+    ...connected,
+    users: [{ seerrUserId: 1, number: '15550000001', enabled: true }],
+    seerrRoster: [{ id: 1, name: 'Someone', email: 'a@b.c', isAdmin: true }],
+  });
+  assert.equal(health.healthy, true);
+  assert.match(health.message ?? '', /Could not check which session will send/);
 });
 
 test('a broken connection is reported on its own', async () => {

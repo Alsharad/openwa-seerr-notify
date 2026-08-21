@@ -48,6 +48,9 @@ function harness(config: SeerrConfig = baseConfig(), netBody?: Record<string, un
     },
     log: (m) => logs.push(m),
     sleep: async () => {},
+    // The harness stands in for a single-session gateway, which is what nearly every install is: the
+    // instance's binding wins when it has one, and the lone ready session covers it when it does not.
+    resolveSession: async (bound) => ({ ok: true, sessionId: bound ?? 'only-session', stale: false }),
     now: () => '2026-01-01T00:00:00.000Z',
   };
 
@@ -155,24 +158,50 @@ test('an unmatched event is dropped quietly when a mapping is not required', asy
   assert.equal(deadLetters().length, 0);
 });
 
-test('a delivery with no session to send from is dead-lettered', async () => {
+test('a delivery with no session to send from is dead-lettered, carrying the resolver\'s reason', async () => {
   const { deps, sent, deadLetters } = harness();
-  await handleSeerrWebhook(deps, requestWithoutSession(availablePayload));
-
-  assert.equal(sent.length, 0);
-  assert.equal(deadLetters()[0].reason, 'no_session');
-});
-
-test('an unbound instance fails with the fix in the dead letter, and never guesses a session', async () => {
-  // There is no plugin-side fallback: which session to send from is the host's to decide, and a config
-  // key that quietly answered it differently from the instance binding was one answer too many.
-  const { deps, sent, deadLetters } = harness(baseConfig({ fallbackSessionId: 'ignored-if-present' }));
+  deps.resolveSession = async () => ({ ok: false, detail: '2 WhatsApp sessions are connected' });
   await handleSeerrWebhook(deps, requestWithoutSession(availablePayload));
   await new Promise((r) => setTimeout(r, 0));
 
-  assert.equal(sent.length, 0, 'a stale fallbackSessionId in an older config must not resurrect the behaviour');
+  assert.equal(sent.length, 0);
   assert.equal(deadLetters()[0].reason, 'no_session');
-  assert.match(deadLetters()[0].detail ?? '', /Configure > Instances/, 'the dead letter must name the fix');
+  assert.match(
+    deadLetters()[0].detail ?? '',
+    /2 WhatsApp sessions are connected/,
+    'the reason the resolver gave is the one the operator needs; a generic message loses it',
+  );
+});
+
+test('an unbound instance sends from the session the resolver picked', async () => {
+  const { deps, sent } = harness();
+  await handleSeerrWebhook(deps, requestWithoutSession(availablePayload));
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.ok(sent.length > 0, 'an unbound instance is the normal state — it must not be a dead end');
+  assert.equal(sent[0].sessionId, 'only-session');
+});
+
+test('a bound instance sends from its binding, and a legacy fallbackSessionId is still never read', async () => {
+  // The config key is long gone; this pins that an old config carrying one cannot steer a delivery.
+  const { deps, sent } = harness(baseConfig({ fallbackSessionId: 'ignored-if-present' }));
+  await handleSeerrWebhook(deps, request(availablePayload));
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.equal(sent[0].sessionId, 'sess', 'the instance binding wins over anything in config');
+});
+
+test('a stale binding is logged every time it is worked around, not silently papered over', async () => {
+  const { deps, sent, logs } = harness();
+  deps.resolveSession = async () => ({ ok: true, sessionId: 'only-session', stale: true });
+  await handleSeerrWebhook(deps, request(availablePayload));
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.ok(sent.length > 0, 'a stale binding still delivers — it works, by accident of there being one option');
+  assert.ok(
+    logs.some((l) => /bound session no longer exists/.test(l)),
+    'it stops working the moment a second session is paired, and nothing else would say so',
+  );
 });
 
 test('the handler returns without waiting for the sends — the 5 s dispatch budget is never at risk', async () => {

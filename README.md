@@ -88,14 +88,14 @@ Most of this is done for you by the **Setup** tab (the last tab on the config sc
 webhook URL read back from the gateway, generates the header secret, and spells out what to set in Seerr.
 The full path:
 
-1. **Have a WhatsApp session running** in OpenWA, and note its session id.
+1. **Have a WhatsApp session running** in OpenWA.
 2. **Create a Seerr API key** (Seerr → Settings → General → API Key). It is required:
    the recipient list is read from Seerr, so a Seerr account is the only thing that can be mapped to a
    WhatsApp number.
 3. **Install and enable the plugin** (below). It enables with an empty config — there is nothing to
    configure before it is running, and the buttons that fetch things only work while it *is* running.
-4. **Create an ingress instance** on **Configure → Instances → Create**: an id (`seerr-prod` is fine),
-   and **the WhatsApp session to send from** — an instance bound to no session delivers nothing. It shows
+4. **Create an ingress instance** on **Configure → Instances → Create**: an id (`seerr-prod` is fine) is
+   all it needs. Leave **Session scope** blank — see [Which session sends](#which-session-sends). It shows
    the secret once; keep it. That tab is also where you copy the webhook URL and regenerate a secret
    later, and it always shows the live values.
 5. **Open Configure → Connection**, fill in the Seerr URL and API key, and Save. Both are required. Use
@@ -117,6 +117,30 @@ The full path:
    then tick the people you want and give them WhatsApp numbers. Nothing is delivered until at least one
    recipient exists — the health check says so, and an arriving notification is dropped with that reason
    in the log.
+
+### Which session sends
+
+Deliveries go out from the WhatsApp session bound to the ingress instance — and if the instance names
+none, from the one session that is connected.
+
+That fallback exists because the binding is close to unsettable from the dashboard. The field is free
+text labelled *"Session scope (optional)"* with the placeholder *"Leave blank for all sessions"*, it is
+stored verbatim with no lookup, and the Sessions page renders `session.id.substring(0, 12)` with no copy
+control — so the full id you would have to paste is not shown anywhere. The usual result is an unbound
+instance, which looks like a healthy install until every delivery dead-letters as `no_session`.
+
+The rule is narrow on purpose: **the fallback applies only when exactly one session is ready.** One ready
+session means there is no other it could have meant, so there is no wrong choice available. Beyond that:
+
+- A binding to a ready session always wins. The fallback never overrides an explicit choice.
+- A binding to a session that exists but is *not* ready fails, and says which and why. It does not
+  quietly send from a different one.
+- A binding to a session that no longer exists — deleted, or re-paired, which mints a **new id** — falls
+  back and logs that it did. This is the case a stored binding cannot survive on its own.
+- Two or more ready sessions with no binding fails and names them. Bind the instance to the one you want.
+
+The health-check button reports which session will send, so an install that cannot deliver says so before
+a notification is lost rather than after.
 
 ### Reaching a self-hosted Seerr
 
