@@ -285,3 +285,22 @@ test('the icon sheet has no unused symbols and no missing ones', () => {
   assert.deepEqual([...used].filter((name) => !defined.has(name)), [], 'icon used but never defined');
   assert.deepEqual([...defined].filter((name) => !used.has(name)), [], 'icon defined but never used');
 });
+
+test('a secret being replaced is never left on screen to be copied', () => {
+  // The gap between pressing generate and the new value landing is a few seconds. Showing the old
+  // secret through that gap is not a cosmetic problem: it is long enough to copy a credential that is
+  // about to stop working into Seerr, and the failure shows up later as 401s on every delivery.
+  const render = /function renderSetup\(\) \{([\s\S]*?)\n  \}/.exec(html);
+  assert.ok(render, 'could not find renderSetup in the editor');
+  assert.match(
+    render[1],
+    /generating\s*\?\s*''\s*:/,
+    'renderSetup must blank the secret while one is being generated, not re-show the previous value',
+  );
+  assert.match(render[1], /pending && pending\.action === 'secret'/, 'the busy state must key off the in-flight action');
+
+  // The repaint has to happen at both ends: on press (so the stale value goes immediately) and when the
+  // action settles (so success reveals the new secret, and failure restores the old one).
+  assert.match(/function requestSetup\([\s\S]*?\n  \}/.exec(html)[0], /renderSetup\(\);/);
+  assert.match(/function finishSetup\(\) \{[\s\S]*?\n  \}/.exec(html)[0], /renderSetup\(\);/);
+});

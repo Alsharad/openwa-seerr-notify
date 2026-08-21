@@ -138,6 +138,9 @@
   .icon.wide { width: auto; padding: 0 11px; font: inherit; font-size: 12px; }
   .icon.wide[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
   .icon.armed { color: var(--danger); background: var(--danger-soft); }
+  .icon[aria-busy="true"] { color: var(--accent); opacity: 1; }
+  .icon[aria-busy="true"] svg { animation: spin .9s linear infinite; transform-origin: 50% 50%; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   .btn {
     display: inline-flex; align-items: center; gap: 6px; border-radius: var(--radius-sm);
@@ -260,6 +263,9 @@
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    /* A .01ms infinite spin is a strobe, not a still frame — stop it outright and let the accent
+       colour plus the status line carry the "working" state. */
+    .icon[aria-busy="true"] svg { animation: none !important; }
   }
 </style>
 </head>
@@ -905,16 +911,28 @@
   function renderSetup() {
     renderInstances();
 
-    var secret = typeof setup.secret === 'string' ? setup.secret : '';
+    // While a new secret is being minted the OLD one is not shown at all. It is about to stop working,
+    // and the gap between pressing generate and the value landing is a few seconds — long enough to
+    // copy the previous secret into Seerr and wonder why every delivery 401s.
+    var generating = !!(pending && pending.action === 'secret');
+    var secret = generating ? '' : (typeof setup.secret === 'string' ? setup.secret : '');
     var field = el('ingressSecret');
     var reveal = el('revealSecret');
+    var generate = el('generateSecret');
+
     field.value = secret;
     field.type = 'password';
+    field.placeholder = generating ? 'generating…' : '64 hex characters…';
+    field.setAttribute('aria-busy', generating ? 'true' : 'false');
     reveal.setAttribute('aria-pressed', 'false');
     reveal.setAttribute('aria-label', 'Show the secret');
     setIcon(reveal, 'i-eye');
     reveal.disabled = secret === '';
     el('copySecret').disabled = secret === '';
+
+    generate.setAttribute('aria-busy', generating ? 'true' : 'false');
+    generate.setAttribute('aria-label', generating ? 'Generating a new secret' : 'Generate a new secret');
+    if (generating) generate.disabled = true;
 
     var update = setup.update || null;
     el('updateMeta').textContent = !update
@@ -938,6 +956,9 @@
     saveBtn.disabled = true;
     refreshBtn.disabled = true;
     setStatus(label, true);
+    // Repaint BEFORE the save goes out, so the value being replaced is off the screen immediately
+    // rather than a round trip later.
+    renderSetup();
     parent.postMessage({ type: 'config:save', config: assembleConfig() }, '*');
   }
 
@@ -980,6 +1001,9 @@
     pending = null;
     saveBtn.disabled = false;
     refreshBtn.disabled = false;
+    // Repaint without the busy state: on success this reveals the new secret, and on failure or a
+    // give-up it puts the previous one back rather than leaving the field blank for ever.
+    renderSetup();
   }
 
   // ── Config in and out ───────────────────────────────────────────────────

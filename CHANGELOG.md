@@ -6,6 +6,16 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.8.1] — 2026-08-21
+
+### Fixed
+
+- **Generating a secret left the previous one on screen, copyable, for the few seconds until the new one
+  landed.** That gap was long enough to copy a credential that had already stopped working into Seerr and
+  then watch every delivery 401. The field now empties the moment you confirm, the copy and reveal
+  buttons go with it, and the generate icon spins until the new value arrives. A failed or timed-out
+  generate puts the previous secret back rather than leaving the field blank.
+
 ## [1.8.0] — 2026-08-21
 
 ### Removed — action required
