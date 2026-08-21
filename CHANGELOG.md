@@ -22,6 +22,35 @@ All notable changes to this plugin are documented here. The format follows
 - Removed the instruction to reload the page after Refresh from Seerr; the list has repainted in place
   since 1.9.0. Host placeholders read `<openwa-host>:<openwa-port>` everywhere, matching the panel.
 
+## [1.15.2] — 2026-08-21
+
+### Fixed
+
+- **The commonest first-run failure now says what to do about it.** A self-hosted Seerr is nearly always
+  on a LAN, and OpenWA's SSRF guard refuses private addresses until the operator opts in. A tester got:
+
+  > Cannot reach `http://192.168.8.25:5055` — Blocked internal address: 192.168.8.25. Check the address,
+  > and SSRF_ALLOWED_HOSTS if it is a private one. No recipients yet — tick someone on the Recipients tab…
+
+  Correct, and close to useless: it names the address twice, quotes a rule rather than a remedy, mentions
+  the variable without the value, and then appends an unrelated problem. It now reads:
+
+  > OpenWA blocks private addresses, so it will not call `http://192.168.8.25:5055`. Set
+  > `SSRF_ALLOWED_HOSTS=192.168.8.25` in the gateway's environment and restart it.
+
+  The value is taken from the URL's host, so a hostname URL gets `SSRF_ALLOWED_HOSTS=seerr.lan` — the
+  guard matches what the URL says, not what it resolves to.
+
+- **A failed connection is reported on its own.** The recipients note is only appended when the
+  connection is sound; someone whose Seerr is unreachable has one problem to solve, and burying that
+  sentence under a second one helps nobody.
+
+### Documentation
+
+- *Reaching a self-hosted Seerr* leads with the private-address case, with a `docker-compose.yml` snippet,
+  the comma-separated form for several hosts, and why `SSRF_ALLOWED_HOSTS` is the right lever rather than
+  `WEBHOOK_SSRF_PROTECT=false`, which disables the guard for every plugin on the host.
+
 ## [1.15.1] — 2026-08-21
 
 ### Fixed

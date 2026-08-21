@@ -377,12 +377,16 @@ export default class SeerrNotifyPlugin implements IPlugin {
       if (!probe.ok) healthy = false;
     }
 
-    try {
-      readConfig(ctx.config);
-    } catch (err) {
-      // readConfig throws only when nothing could be delivered at all — no mapped recipient. Worth
-      // saying, not worth failing on: see the note above the method.
-      notes.push(err instanceof Error ? err.message : String(err));
+    // Only when the connection is sound. Someone whose Seerr is unreachable has one problem to solve,
+    // and appending "…and by the way, no recipients yet" to it buries the sentence that matters.
+    if (healthy) {
+      try {
+        readConfig(ctx.config);
+      } catch (err) {
+        // readConfig throws only when nothing could be delivered at all — no mapped recipient. Worth
+        // saying, not worth failing on: see the note above the method.
+        notes.push(err instanceof Error ? err.message : String(err));
+      }
     }
 
     try {

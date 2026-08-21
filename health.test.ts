@@ -78,3 +78,16 @@ test('a fully configured plugin reports the version and nothing else', async () 
   assert.equal(health.healthy, true);
   assert.equal(health.message, 'Seerr v3.4.1');
 });
+
+test('a broken connection is reported on its own', async () => {
+  // A tester saw: "Cannot reach … Blocked internal address … Check the address, and SSRF_ALLOWED_HOSTS
+  // if it is a private one. No recipients yet — tick someone on the Recipients tab…". Two unrelated
+  // problems in one toast, the actionable one buried. Someone whose Seerr is unreachable has one job.
+  const health = await healthOf(connected, async () => {
+    throw new Error('Blocked internal address: 192.168.8.25');
+  });
+
+  assert.equal(health.healthy, false);
+  assert.match(health.message ?? '', /SSRF_ALLOWED_HOSTS=/);
+  assert.doesNotMatch(health.message ?? '', /No recipients yet/, 'one problem at a time');
+});

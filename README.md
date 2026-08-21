@@ -135,15 +135,39 @@ The full path:
 
 ### Reaching a self-hosted Seerr
 
-The manifest declares `net.allow: ["*"]`. That is not laziness: the host only auto-admits a config URL
-through `net.allowConfigHosts` when it is **https** (OpenWA's own `plugin-net.ts`, `effectiveNetAllow`), and a
-self-hosted Seerr is almost always `http://192.168.x.x:5055`. With a fixed host list, every such install
-fails with `Plugin seerr-notify may not fetch …` and the only fix is unzipping the package to edit the
-manifest. The real gate stays where the operator can reach it: OpenWA's SSRF guard, and
-`SSRF_ALLOWED_HOSTS` when the guard blocks a private address.
+**If your Seerr is on a private address — anything `192.168.x.x`, `10.x.x.x` or `172.16–31.x.x` — OpenWA
+will refuse to call it until you say so.** The health check reports:
 
-If enrichment silently no-ops — messages arrive without overview, ratings or cast — run the health check.
-It names the cause.
+> OpenWA blocks private addresses, so it will not call `http://192.168.8.25:5055`. Set
+> `SSRF_ALLOWED_HOSTS=192.168.8.25` in the gateway's environment and restart it.
+
+That is the whole fix. Set it on the OpenWA container — the value is the **host as it appears in your
+Seerr URL**, with no scheme and no port, and it takes a restart:
+
+```yaml
+# docker-compose.yml
+services:
+  openwa:
+    environment:
+      - SSRF_ALLOWED_HOSTS=192.168.8.25
+```
+
+Several hosts are comma-separated. Use the hostname rather than the address if your URL is a name
+(`SSRF_ALLOWED_HOSTS=seerr.lan`) — the guard matches on what the URL says, not on what it resolves to.
+
+This is OpenWA protecting its own network from a plugin that could otherwise be told to fetch anything on
+it, so it is worth understanding rather than switching off wholesale: `WEBHOOK_SSRF_PROTECT=false`
+disables the guard for **every** plugin on the host, while `SSRF_ALLOWED_HOSTS` opens exactly the one
+address you named.
+
+Some OpenWA builds do not enforce this and reach a LAN address without the variable. Either way the
+health check tells you which one you have.
+
+**Why `net.allow` is `["*"]`** and not a host list: the host only auto-admits a config URL through
+`net.allowConfigHosts` when it is **https** (OpenWA's own `plugin-net.ts`, `effectiveNetAllow`), and a
+self-hosted Seerr almost never is. With a fixed list, every such install fails with `Plugin seerr-notify
+may not fetch …` and the only fix is unzipping the package to edit the manifest. The real gate stays
+where the operator can reach it — the SSRF guard above.
 
 ## Install
 

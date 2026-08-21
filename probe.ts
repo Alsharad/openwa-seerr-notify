@@ -37,6 +37,15 @@ function describe(error: unknown): string {
   return message.length > 160 ? `${message.slice(0, 157)}...` : message;
 }
 
+/** The host as SSRF_ALLOWED_HOSTS wants it — a bare hostname or IP literal, no scheme, no port. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^\[|\]$/g, '');
+  } catch {
+    return url;
+  }
+}
+
 async function get(deps: ProbeDeps, path: string, withKey: boolean): Promise<PluginNetResponse> {
   return deps.fetch(`${deps.baseUrl}${path}`, {
     headers: withKey ? { 'X-Api-Key': deps.apiKey, Accept: 'application/json' } : { Accept: 'application/json' },
@@ -63,14 +72,24 @@ export async function probeSeerr(deps: ProbeDeps): Promise<ProbeResult> {
   ]);
 
   if (statusResult.status === 'rejected') {
-    return {
-      ok: false,
-      // The address belongs in a FAILURE — it is the thing to check. On success it is noise the operator
-      // just typed in on the previous tab.
-      message:
-        `Cannot reach ${deps.baseUrl} — ${describe(statusResult.reason)}. ` +
-        'Check the address, and SSRF_ALLOWED_HOSTS if it is a private one.',
-    };
+    const reason = describe(statusResult.reason);
+
+    // The single most likely first-run failure, because a self-hosted Seerr is nearly always on a LAN:
+    // OpenWA's SSRF guard refuses private addresses unless the operator opts in. The guard's own wording
+    // — "Blocked internal address: 192.168.8.25" — states the rule and not the remedy, and repeating the
+    // address after "Cannot reach <url>" says it twice. Give the exact variable and value instead.
+    if (/blocked internal address/i.test(reason)) {
+      return {
+        ok: false,
+        message:
+          `OpenWA blocks private addresses, so it will not call ${deps.baseUrl}. ` +
+          `Set SSRF_ALLOWED_HOSTS=${hostOf(deps.baseUrl)} in the gateway's environment and restart it.`,
+      };
+    }
+
+    // The address belongs in a FAILURE — it is the thing to check. On success it is noise the operator
+    // just typed in on the previous tab.
+    return { ok: false, message: `Cannot reach ${deps.baseUrl} — ${reason}.` };
   }
 
   const status = statusResult.value;
