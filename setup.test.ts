@@ -100,7 +100,7 @@ test('instance discovery keeps the ingress URL and flags a relative one', async 
   const { deps, calls } = harness({
     '/api/integration/plugins/seerr-notify/instances': {
       body: [
-        instanceRow('seerr-prod', 'http://192.168.1.8:2785/api/ingress/seerr-notify/seerr-prod/seerr'),
+        instanceRow('seerr-prod', 'http://192.168.1.50:2785/api/ingress/seerr-notify/seerr-prod/seerr'),
         instanceRow('seerr-dev', '/api/ingress/seerr-notify/seerr-dev/seerr', { sessionScope: 'sess-1', enabled: false }),
       ],
     },
@@ -113,7 +113,7 @@ test('instance discovery keeps the ingress URL and flags a relative one', async 
       instanceId: 'seerr-prod',
       sessionScope: '',
       enabled: true,
-      url: 'http://192.168.1.8:2785/api/ingress/seerr-notify/seerr-prod/seerr',
+      url: 'http://192.168.1.50:2785/api/ingress/seerr-notify/seerr-prod/seerr',
       relative: false,
     },
     {

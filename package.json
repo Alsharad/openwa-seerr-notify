@@ -4,8 +4,29 @@
   "private": true,
   "type": "module",
   "description": "OpenWA plugin: deliver Overseerr/Jellyseerr notifications over WhatsApp, routed per recipient.",
+  "keywords": [
+    "overseerr",
+    "jellyseerr",
+    "seerr",
+    "notifications",
+    "media",
+    "plex",
+    "jellyfin",
+    "openwa"
+  ],
+  "author": "gunslingerkw",
   "license": "MIT",
-  "engines": { "node": ">=22" },
+  "homepage": "https://github.com/Alsharad/openwa-seerr-notify#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alsharad/openwa-seerr-notify.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Alsharad/openwa-seerr-notify/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "node build.mjs",
     "test": "node --import tsx --test *.test.ts",

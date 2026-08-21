@@ -189,7 +189,7 @@ test('the editor script parses', () => {
 });
 
 test('the manifest can reach an operator-hosted Seerr, not only an https one', () => {
-  // Proven on a live gateway: with net.allow scoped to a fixed host list, `http://192.168.1.8:5055`
+  // Proven on a live gateway: with net.allow scoped to a fixed host list, `http://192.168.1.50:5055`
   // was refused as "Plugin seerr-notify may not fetch … add its host to net.allow", and there is no
   // way for an operator to fix that without unzipping the package. net.allowConfigHosts cannot cover
   // it either — the host only admits a config URL when it is https (core plugin-net.ts,

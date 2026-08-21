@@ -1,6 +1,16 @@
+# Build output. The packaged plugin is published as a release asset, never committed —
+# a zip in git goes stale the moment any source file changes.
 node_modules/
 dist/
 *.zip
+*.sha256
 *.tgz
+
+# Local tooling and editor droppings.
+.claude/
+.env
+.env.*
+*.log
 .DS_Store
-seerr-notify.zip.sha256
+.idea/
+.vscode/

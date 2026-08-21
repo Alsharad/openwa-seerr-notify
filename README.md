@@ -7,7 +7,6 @@
 ![type: extension](https://img.shields.io/badge/type-extension-blue.svg)
 ![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)
 ![built for OpenWA](https://img.shields.io/badge/OpenWA-%E2%89%A5%200.8.16-25D366.svg)
-[![CI](https://github.com/Alsharad/openwa-seerr-notify/actions/workflows/ci.yml/badge.svg)](https://github.com/Alsharad/openwa-seerr-notify/actions/workflows/ci.yml)
 
 An [OpenWA](https://github.com/rmyndharis/OpenWA) plugin. Built against the conventions in that
 project's [plugin standard](https://github.com/rmyndharis/OpenWA-plugins/blob/main/PLUGIN-STANDARD.md).
@@ -24,8 +23,9 @@ project's [plugin standard](https://github.com/rmyndharis/OpenWA-plugins/blob/ma
 
 - **A Setup tab that does the fiddly parts** — reads the webhook URL back from the gateway so you paste
   rather than assemble it, generates the secret Seerr authenticates with, and says what else to set.
-- **Tells you when there is a new release** — a daily GitHub check and a banner; nothing is downloaded,
-  and it switches off in one click.
+- **Updates itself** — a daily GitHub check raises a banner, and **Install it** replaces the plugin in
+  place, keeping your config and recipients. The download is pinned to the sha256 GitHub publishes for
+  the release asset. The check switches off in one click; the install always takes two presses.
 - **Routing you control** — a clickable matrix of every Seerr `notification_type` against requester,
   admins, and whether admins get the Admin Info block. Defaults to the sensible thing: requesters hear
   about their own requests, admins hear about anything they may need to act on.
@@ -88,7 +88,7 @@ The full path:
    because it needs an admin API key the config screen never sees:
 
    ```bash
-   curl -X POST http://<openwa-host>:2785/api/integration/plugins/seerr-notify/instances \
+   curl -X POST http://<openwa-host>:<openwa-port>/api/integration/plugins/seerr-notify/instances \
      -H "X-API-Key: <ADMIN_KEY>" -H 'Content-Type: application/json' \
      -d '{"instanceId":"seerr-prod","sessionScope":"<your-session-id>"}'
    ```
@@ -113,14 +113,15 @@ The full path:
      only *adds* things is fine.
    - Tick the notification types you want. Seerr decides what is sent at all; the **Who gets what** tab
      decides who receives each one.
-8. **Configure → Recipients**, press **Refresh from Seerr**, reload the page, then enable the people you
-   want and give them WhatsApp numbers. Nothing is delivered until at least one recipient exists — the
-   health check says so, and an arriving notification is dropped with that reason in the log.
+8. **Configure → Recipients**, press **Refresh from Seerr** and wait a second for the list to appear,
+   then tick the people you want and give them WhatsApp numbers. Nothing is delivered until at least one
+   recipient exists — the health check says so, and an arriving notification is dropped with that reason
+   in the log.
 
 ### Reaching a self-hosted Seerr
 
 The manifest declares `net.allow: ["*"]`. That is not laziness: the host only auto-admits a config URL
-through `net.allowConfigHosts` when it is **https** (core `plugin-net.ts`, `effectiveNetAllow`), and a
+through `net.allowConfigHosts` when it is **https** (OpenWA's own `plugin-net.ts`, `effectiveNetAllow`), and a
 self-hosted Seerr is almost always `http://192.168.x.x:5055`. With a fixed host list, every such install
 fails with `Plugin seerr-notify may not fetch …` and the only fix is unzipping the package to edit the
 manifest. The real gate stays where the operator can reach it: OpenWA's SSRF guard, and
@@ -192,7 +193,7 @@ people twice — so the answer is a better test rig, not weaker dedup.
 
 ```bash
 export SEERR_INGRESS_TOKEN=<instance secret>
-export INGRESS_URL=http://<openwa-host>:2785/api/ingress/seerr-notify/seerr-prod/seerr
+export INGRESS_URL=http://<openwa-host>:<openwa-port>/api/ingress/seerr-notify/seerr-prod/seerr
 
 node send-test.mjs --list                        # every event type
 node send-test.mjs                               # TEST_NOTIFICATION (admins)
@@ -211,9 +212,16 @@ npm ci
 npm run check      # typecheck + tests + package
 ```
 
-`npm run build` writes `seerr-notify.zip`. Releases are cut by tagging `v<x.y.z>` — CI builds the zip,
-attaches it with a checksum, and the manifest version must match the top CHANGELOG heading or the build
-fails.
+`npm run build` writes `seerr-notify.zip`. The packaging step is a gate, not just a bundler: it refuses
+to build when `manifest.json`, `package.json` and the top released CHANGELOG heading disagree on the
+version, when `manifest.main` is missing from the archive, or when the result exceeds OpenWA's 5 MB
+install limit.
+
+`.github/workflows/ci.yml` runs the same three commands on every push, and tagging `v<x.y.z>` publishes a
+release with the zip and its checksum attached. There is no CI badge above because this repository's
+Actions are currently disabled for billing reasons — every run fails in seconds without executing
+anything, which would show as a red badge on code that passes. Run `npm run check` locally until that
+clears.
 
 ## Configuration
 
@@ -275,8 +283,8 @@ it. This table is where the detail lives.
   dispatches inline with a single attempt. It does not matter much here: the plugin backgrounds its own
   delivery, so the host's retry would not have covered the sends anyway. See **Why the work is
   backgrounded**.
-- **`TEST_NOTIFICATION` goes to admins only**, by default. If no enabled recipient is a Seerr admin, a
-  test reaches nobody and is recorded as `no_recipients`; the Recipients tab warns when that is the case.
+- **`TEST_NOTIFICATION` goes to admins only**, by default. If no notified recipient is a Seerr admin, a
+  test reaches nobody and is recorded as `no_recipients`, which the health check reports.
 - **The Refresh button needs the gateway's key file.** It reads `/app/data/.api-key` to write the roster
   back through OpenWA's own API — see **Security**. Where that file is unreadable, use
   `refresh-roster.mjs` instead, which takes the key from the environment.
@@ -300,8 +308,8 @@ restart. Nothing is cached across deliveries.
   constant time before the plugin runs.
 - **`shared-secret` authenticates the caller, not the body.** Unlike an HMAC scheme it does not bind the
   request content, so anyone holding the token can send any payload — and a token in a static header is
-  replayable. This is the strongest scheme Seerr's webhook agent can produce, since it sends fixed custom
-  headers and cannot sign. Treat the secret as a credential: prefer HTTPS to the ingress URL, keep the
+  replayable. This is the strongest scheme Seerr's webhook agent can produce: it sends fixed header
+  values and cannot sign a request. Treat the secret as a credential: prefer HTTPS to the ingress URL, keep the
   route off the public internet where you can, and rotate with
   `POST /api/integration/plugins/seerr-notify/instances/<id>/regenerate-secret` if it leaks.
 - **A valid token can trigger WhatsApp sends** to the numbers in your mapping — never to arbitrary
@@ -310,8 +318,12 @@ restart. Nothing is cached across deliveries.
   WhatsApp messages. Control characters are stripped and every field is length-capped, but the content
   itself is whoever wrote it in Seerr.
 - **The poster URL is fetched by the host**, through the same SSRF guard as any other media send.
-- **Secrets in logs**: the API key is stored masked and never logged; chat ids are masked to their last
-  four digits; message bodies are never logged, at any log level.
+- **Both credentials are readable through the API.** The Seerr API key and the last generated ingress
+  secret are mirrored into the `setup` config object so the settings panel can display them — see *Both
+  credentials are readable in `setup`* for why, what it costs, and the one function to delete if you
+  disagree. Neither is ever logged.
+- **Secrets in logs**: chat ids are masked to their last four digits, and message bodies are never
+  logged, at any log level.
 - **The worker is crash containment, not a security boundary** — as OpenWA's own docs state. Plugin code
   keeps `require('fs')` and raw sockets whatever the manifest declares.
 - **`net.allow` is `["*"]`**, because the host only auto-admits an `https` config URL and a self-hosted

@@ -6,6 +6,22 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+### Documentation
+
+- Repository hygiene, no behaviour change: `package.json` carries `repository` / `homepage` / `bugs` /
+  `keywords`; `.gitignore` covers `.env*`, editor directories and `*.sha256` rather than one named file;
+  and the maintainer's real LAN address is out of the tracked files, replaced by the `192.168.1.50`
+  placeholder the docs already used.
+- Corrected two Security claims that had gone stale: the Seerr API key is **not** stored masked any more
+  (1.12.0 mirrors it so the panel can show it), and Seerr authenticates through its Authorization Header
+  field rather than a custom one. A security section that contradicts the configuration section is worse
+  than one that says nothing.
+- Dropped the CI badge. Actions are disabled on this repository for billing reasons, so every run fails
+  in seconds without executing anything — a red badge over code that passes. **Build from source** says
+  so instead.
+- Removed the instruction to reload the page after Refresh from Seerr; the list has repainted in place
+  since 1.9.0. Host placeholders read `<openwa-host>:<openwa-port>` everywhere, matching the panel.
+
 ## [1.12.0] — 2026-08-21
 
 ### Changed
@@ -305,7 +321,7 @@ All notable changes to this plugin are documented here. The format follows
   Seerr settings" works on a fresh install. It previously returned `no recipients enabled` and never
   probed — which is the wrong order: you connect Seerr, fetch the roster, and only then map anyone.
 - `net.allow` is now `["*"]`. Verified on a live gateway: with a fixed host list, a Seerr on
-  `http://192.168.1.8:5055` was refused with `Plugin seerr-notify may not fetch …`, and there was no way
+  `http://192.168.1.50:5055` was refused with `Plugin seerr-notify may not fetch …`, and there was no way
   to fix it without unzipping the package — `net.allowConfigHosts` only admits a config URL when it is
   **https**, and a self-hosted Seerr almost never is. The real gate stays the host's SSRF guard and
   `SSRF_ALLOWED_HOSTS`, which the operator controls.
