@@ -215,6 +215,16 @@ export default class SeerrNotifyPlugin implements IPlugin {
     await this.mirrorSeerrKey(ctx).catch((err) =>
       ctx.logger.debug(`seerr-notify: could not mirror the Seerr key — ${String(err)}`),
     );
+
+    // The instance list is a cache, and instances are created on OpenWA's own Instances tab — which this
+    // plugin never hears about. Re-reading it on any config change means the list heals itself the next
+    // time anything is saved, instead of staying empty until somebody finds the Check again button. It is
+    // a loopback GET, and it only writes when the list has actually changed.
+    await refreshSetupInBackground(
+      this.setupDeps(ctx),
+      readSetup((ctx.config as Record<string, unknown>).setup),
+      { checkUpdates: false, intervalMs: CHECK_INTERVAL_MS },
+    ).catch(() => undefined);
   }
 
   /**

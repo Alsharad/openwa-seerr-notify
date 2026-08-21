@@ -354,11 +354,16 @@ export async function refreshSetupInBackground(
   }
 
   try {
-    state.instances = await discoverInstances(deps);
-    state.instancesAt = now().toISOString();
-    changed = true;
+    const instances = await discoverInstances(deps);
+    // Only a real difference is worth a write. This runs on every config change as well as on enable, so
+    // writing unconditionally would put a row through the gateway for every save.
+    if (JSON.stringify(instances) !== JSON.stringify(previous.instances)) {
+      state.instances = instances;
+      state.instancesAt = now().toISOString();
+      changed = true;
+    }
   } catch {
-    // Loopback or the key file is unavailable — the Setup tab's Refresh button reports it properly.
+    // Loopback or the key file is unavailable — the Setup tab's Check again button reports it properly.
   }
 
   const lastCheck = Date.parse(previous.update?.checkedAt ?? '');

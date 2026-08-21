@@ -220,7 +220,7 @@ test('rotating also refreshes the URL list, but a failure to list does not lose 
   assert.equal(state.secretAt, '2026-08-21T12:00:00.000Z');
 });
 
-test('the background pass checks GitHub at most once per interval', async () => {
+test('the background pass checks GitHub at most once per interval, and writes only on a change', async () => {
   const { deps, written } = harness({
     '/api/integration/plugins/seerr-notify/instances': {
       body: [instanceRow('seerr-prod', 'http://host:2785/api/ingress/seerr-notify/seerr-prod/seerr')],
@@ -230,16 +230,27 @@ test('the background pass checks GitHub at most once per interval', async () => 
 
   const first = await refreshSetupInBackground(deps, EMPTY_SETUP, { checkUpdates: true, intervalMs: day });
   assert.equal(first?.update?.available, true, 'v9.9.9 against 1.6.0');
+  assert.equal(first?.instances.length, 1);
+  assert.equal(written().length, 1);
 
-  // Checked a minute ago: the instance read still runs (it never leaves the container), GitHub does not.
-  const recent = { ...first!, update: { ...first!.update!, checkedAt: '2026-08-21T11:59:00.000Z' } };
-  const second = await refreshSetupInBackground(deps, recent, { checkUpdates: true, intervalMs: day });
-  assert.equal(second?.update?.checkedAt, '2026-08-21T11:59:00.000Z', 'the old check is kept, not redone');
+  // Run again with everything already current: the check is inside its interval and the instance list is
+  // unchanged, so there is nothing to record. This pass runs on every config change now, so writing
+  // unconditionally would put a row through the gateway for every save the operator makes.
+  const current = { ...first!, update: { ...first!.update!, checkedAt: '2026-08-21T11:59:00.000Z' } };
+  const second = await refreshSetupInBackground(deps, current, { checkUpdates: true, intervalMs: day });
+  assert.equal(second, null, 'nothing changed, so nothing is written');
+  assert.equal(written().length, 1);
 
-  const third = await refreshSetupInBackground(deps, EMPTY_SETUP, { checkUpdates: false, intervalMs: day });
-  assert.equal(third?.update, null, 'switched off means no outbound request at all');
+  // A list that HAS changed is what this pass exists to catch — an instance created on OpenWA's own
+  // Instances tab, which the plugin is never told about.
+  const stale = { ...current, instances: [] };
+  const third = await refreshSetupInBackground(deps, stale, { checkUpdates: true, intervalMs: day });
+  assert.equal(third?.instances.length, 1, 'the newly created instance is picked up');
+  assert.equal(third?.update?.checkedAt, '2026-08-21T11:59:00.000Z', 'without redoing the throttled check');
+  assert.equal(written().length, 2);
 
-  assert.equal(written().length, 3);
+  const off = await refreshSetupInBackground(deps, EMPTY_SETUP, { checkUpdates: false, intervalMs: day });
+  assert.equal(off?.update, null, 'switched off means no outbound request at all');
 });
 
 test('the background pass writes nothing when it has nothing', async () => {

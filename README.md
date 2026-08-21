@@ -95,25 +95,13 @@ The full path:
 3. **Install and enable the plugin** (below). It enables with an empty config — there is nothing to
    configure before it is running, and the buttons that fetch things only work while it *is* running.
 4. **Create an ingress instance**, if you have not got one. This is the address Seerr posts to, and
-   nothing works without one. **Configure → Instances → Create** does it from the dashboard: give it an
-   id (`seerr-prod` is fine), pick the WhatsApp session to send from, and it shows you the secret once.
+   nothing works without one. **Configure → Instances → Create**: give it an id (`seerr-prod` is fine),
+   **bind it to the WhatsApp session you want to send from**, and it shows you the secret once — that is
+   the secret Seerr needs, so keeping it saves you a step later.
 
-   Or over the API, if you would rather:
+   An instance with no session bound passes every check here and then fails every delivery with
+   `no_session`, so the Setup tab says so when it sees one.
 
-   ```bash
-   curl -X POST http://<openwa-host>:<openwa-port>/api/integration/plugins/seerr-notify/instances \
-     -H "X-API-Key: <ADMIN_KEY>" -H 'Content-Type: application/json' \
-     -d '{"instanceId":"seerr-prod","sessionScope":"<your-session-id>"}'
-   ```
-
-   The response carries the ingress `secret` and the `ingressUrls[].url` — **both shown once**. If you
-   keep them, you can skip the secret generation in step 6. `CreateInstanceDto` is strictly validated:
-   an extra field such as `enabled` is rejected with a `400`.
-
-   **`seerr-prod` is a name you pick, not a fixed one.** It becomes a path segment in your webhook URL —
-   `/api/ingress/seerr-notify/<your-instance-id>/seerr` — so every example below that says `seerr-prod`
-   means "whatever you called it". Nothing needs to guess: the Setup tab reads the finished URL back from
-   the gateway and shows you the real one to copy.
 5. **Open Configure → Connection**, fill in the Seerr URL and API key, and Save. Both are required. Use
    the health-check button on the plugin row to confirm — it reports the Seerr version and whether the
    key was accepted, and it works before any recipient exists.

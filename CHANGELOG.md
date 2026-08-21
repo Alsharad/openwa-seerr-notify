@@ -22,6 +22,27 @@ All notable changes to this plugin are documented here. The format follows
 - Removed the instruction to reload the page after Refresh from Seerr; the list has repainted in place
   since 1.9.0. Host placeholders read `<openwa-host>:<openwa-port>` everywhere, matching the panel.
 
+## [1.16.0] — 2026-08-21
+
+### Changed
+
+- **The no-instance state is three sentences and a button.** The `curl` command is gone. OpenWA's own
+  **Instances** tab owns creating these — it has the id field, the session picker and the
+  secret-shown-once view — and restating its instructions here only created a second description to keep
+  in step with a tab this plugin does not control. It names the tab and gets out of the way.
+
+### Fixed
+
+- **The instance list no longer goes stale until somebody finds the button.** It is a cache, and
+  instances are created on a tab the plugin never hears about, so creating one left the Setup tab empty
+  through browser reloads — the cache was correct, just old. The plugin now re-reads the list on any
+  config change, and writes only when it has actually changed, so the panel heals itself the next time
+  anything is saved.
+- **An instance bound to no WhatsApp session is now called out.** It reaches this panel looking perfectly
+  healthy — the URL renders, the secret works, the health check passes — and then every delivery
+  dead-letters with `no_session`, because there is nowhere to send from. The Setup tab says so, and the
+  README's create step says to bind one.
+
 ## [1.15.4] — 2026-08-21
 
 ### Fixed
