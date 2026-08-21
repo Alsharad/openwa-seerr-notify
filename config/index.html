@@ -352,7 +352,7 @@
       </div>
     </div>
 
-    <p class="hint" id="rosterEmpty" hidden>No Seerr accounts cached yet. Press Refresh from Seerr, then reload this page.</p>
+    <p class="hint" id="rosterEmpty" hidden>No Seerr accounts cached yet — press Refresh from Seerr.</p>
     <table class="people" id="userTable">
       <thead>
         <tr>
@@ -406,7 +406,7 @@
       <input type="checkbox" id="requireMappedUser" name="requireMappedUser" />
       <span class="txt">
         <b>Record events that reach nobody</b>
-        <small>On: an event matching no recipient is kept as a delivery failure you can see. Off: dropped quietly.</small>
+        <small>On: an event matching no recipient is kept in the failure buffer, and the plugin’s health check reports it. Off: dropped quietly.</small>
       </span>
     </label>
     <label class="switch" for="debug">
@@ -418,13 +418,6 @@
     </label>
   </div>
 
-  <div class="card">
-    <div class="field" style="margin-bottom:0">
-      <label for="fallbackSessionId">Fallback WhatsApp session</label>
-      <input type="text" id="fallbackSessionId" name="fallbackSessionId" class="mono"
-             autocomplete="off" spellcheck="false" translate="no" placeholder="optional…" />
-      <small>Used when the ingress instance is not bound to a session.</small>
-    </div>
   </div>
 
   <div class="card">
@@ -509,7 +502,7 @@
 (function () {
   'use strict';
 
-  var SCALARS = ['jellyseerrUrl', 'jellyseerrApiKey', 'fallbackSessionId'];
+  var SCALARS = ['jellyseerrUrl', 'jellyseerrApiKey'];
   var BOOLEANS = ['requireMappedUser', 'sendPoster', 'debug', 'updateCheckEnabled'];
 
   var el = function (id) { return document.getElementById(id); };
@@ -537,6 +530,11 @@
   var SETUP_POLL_MS = [2500, 5000, 9000];
 
   var clock = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+  /** Intl throws a RangeError on an invalid Date, which would take the whole render down with it. */
+  function at(iso) {
+    var when = new Date(iso);
+    return isNaN(when.getTime()) ? '' : clock.format(when);
+  }
 
   function setStatus(message, ok) {
     statusLine.textContent = message;
@@ -935,11 +933,16 @@
     if (generating) generate.disabled = true;
 
     var update = setup.update || null;
-    el('updateMeta').textContent = !update
-      ? 'Never checked for updates.'
-      : update.available
-        ? 'Version ' + update.latest + ' is available.'
-        : 'Checked at ' + clock.format(new Date(update.checkedAt)) + ' — ' + (update.note || 'up to date') + '.';
+    var running = setup.version || (update && update.current) || '';
+    var checked = update ? at(update.checkedAt) : '';
+    var line = running ? 'Running version ' + running + '.' : 'Version unknown until the plugin has run once.';
+
+    if (update && update.available) line += ' Version ' + update.latest + ' is available.';
+    else if (checked) line += ' Checked at ' + checked + ' — ' + (update.note || 'up to date') + '.';
+    else if (update) line += ' ' + (update.note || 'Not checked yet.');
+    else line += ' Never checked for updates.';
+    if (!el('updateCheckEnabled').checked) line += ' Daily checks are off.';
+    el('updateMeta').textContent = line;
 
     var banner = el('updateBanner');
     banner.hidden = !(update && update.available);
@@ -952,11 +955,23 @@
 
   function requestSetup(action, arg, label) {
     setupToken = action + '|' + (arg || '') + '|' + new Date().toISOString();
-    pending = { token: setupToken, action: action, label: label, tries: 0, phase: 'action' };
+    requestPlugin(setupToken, action, label);
+  }
+
+  /**
+   * Ask the plugin to do something, and wait for it to say it has.
+   *
+   * Every button that needs work done shares this: the editor cannot fetch, so it saves a token and the
+   * plugin echoes that token into `setup.lastAction` when the work settles. One signal, one wait, one
+   * repaint — a per-button special case is how the roster refresh ended up telling people to reload the
+   * page while the Setup buttons updated themselves.
+   */
+  function requestPlugin(token, action, label) {
+    pending = { token: token, action: action, label: label, tries: 0, phase: 'action' };
     saveBtn.disabled = true;
     refreshBtn.disabled = true;
     setStatus(label, true);
-    // Repaint BEFORE the save goes out, so the value being replaced is off the screen immediately
+    // Repaint BEFORE the save goes out, so a value about to be replaced is off the screen immediately
     // rather than a round trip later.
     renderSetup();
     parent.postMessage({ type: 'config:save', config: assembleConfig() }, '*');
@@ -990,6 +1005,7 @@
 
   /** What to say once the plugin's answer lands — the next step, not "OK". */
   function setupDone(action) {
+    if (action === 'roster') return 'Recipient list updated.';
     if (action === 'secret') return 'New secret ready. Copy it into Seerr.';
     if (action === 'instances') return 'Instance list re-read from OpenWA.';
     var update = setup.update || {};
@@ -1085,10 +1101,9 @@
   // changed token, fetches the roster, and writes it back.
   function requestRefresh() {
     refreshToken = new Date().toISOString();
-    refreshBtn.disabled = true;
-    saveBtn.disabled = true;
-    setStatus('Fetching your Seerr users…', true);
-    parent.postMessage({ type: 'config:save', config: assembleConfig() }, '*');
+    // Same shape as a Setup action, so the same wait-and-repaint applies: the plugin records
+    // `roster|<token>` as its lastAction when the fetch settles, and the list appears in place.
+    requestPlugin('roster|' + refreshToken, 'roster', 'Fetching your Seerr users…');
   }
 
   // The host resolves 'system' for us, so this is only ever 'light' or 'dark'. Anything else (including
@@ -1127,10 +1142,6 @@
         // The dashboard invalidates its plugins query on a successful save but does not await the
         // refetch, so give it a moment before asking for the value.
         setTimeout(function () { parent.postMessage({ type: 'config:get' }, '*'); }, 700);
-      } else if (refreshBtn.disabled) {
-        setStatus('Fetching from Seerr… reload this page in a few seconds to see the list.', true);
-        refreshBtn.disabled = false;
-        saveBtn.disabled = false;
       } else {
         setStatus('Saved.', true);
         saveBtn.disabled = false;
@@ -1180,6 +1191,7 @@
     button.setAttribute('aria-label', shown ? 'Show the secret' : 'Hide the secret');
     setIcon(button, shown ? 'i-eye' : 'i-eye-off');
   });
+  el('updateCheckEnabled').addEventListener('change', renderSetup);
   el('checkUpdate').addEventListener('click', function () {
     requestSetup('update', '', 'Asking GitHub for the latest release…');
   });

@@ -6,6 +6,40 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.9.0] — 2026-08-21
+
+### Removed
+
+- **The fallback WhatsApp session.** Which session to send from is the host’s to decide — bind the
+  ingress instance under **Configure → Instances**. A plugin-side fallback was a second answer to a
+  question the host already answers, and sending from a session other than the one the instance names is
+  worse than failing. An unbound instance now dead-letters with the fix in the reason. A stale
+  `fallbackSessionId` in an existing config is ignored.
+
+### Added
+
+- The **Updates** section states the running version, when it last checked, and whether daily checks are
+  on. The plugin records its version on every background pass, so the panel can report it even when the
+  release check is switched off or GitHub is unreachable.
+
+### Fixed
+
+- **The health check called a missing Seerr connection healthy**, describing it as “notifications send
+  without media detail”. That was left over from when enrichment was optional; since 1.8.0 the connection
+  is what the recipient list is built from, so an install without one cannot notify anybody. It reports
+  unhealthy, and names the tab to fix it in.
+- **An unreadable update timestamp crashed the Setup tab.** `Intl.DateTimeFormat` throws a `RangeError`
+  on an invalid Date, which took the whole render with it and left the panel blank.
+- **Refresh from Seerr told you to reload the page** while every other button repainted itself. All four
+  now share one mechanism: the plugin echoes the token into `setup.lastAction` when the work settles, and
+  the panel updates in place. A refresh that fails now reports its reason in the panel rather than only
+  in the gateway log.
+- `rosterSyncedAt` was parsed into the plugin’s config and read by nothing. Removed from the parsed type.
+- The **Record events that reach nobody** switch promised a failure “you can see” with nowhere to see it.
+  It now names the health check, which is where those failures are actually reported.
+- `package.json` sat at 1.5.0 through three releases. The build now fails when it disagrees with the
+  manifest, the same way it already did for the changelog.
+
 ## [1.8.1] — 2026-08-21
 
 ### Fixed

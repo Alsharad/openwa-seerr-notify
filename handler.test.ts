@@ -163,13 +163,16 @@ test('a delivery with no session to send from is dead-lettered', async () => {
   assert.equal(deadLetters()[0].reason, 'no_session');
 });
 
-test('the fallback session is used when the instance is not bound to one', async () => {
-  const { deps, sent } = harness(baseConfig({ fallbackSessionId: 'fallback' }));
+test('an unbound instance fails with the fix in the dead letter, and never guesses a session', async () => {
+  // There is no plugin-side fallback: which session to send from is the host's to decide, and a config
+  // key that quietly answered it differently from the instance binding was one answer too many.
+  const { deps, sent, deadLetters } = harness(baseConfig({ fallbackSessionId: 'ignored-if-present' }));
   await handleSeerrWebhook(deps, requestWithoutSession(availablePayload));
   await new Promise((r) => setTimeout(r, 0));
 
-  assert.equal(sent.length, 1);
-  assert.equal(sent[0].sessionId, 'fallback');
+  assert.equal(sent.length, 0, 'a stale fallbackSessionId in an older config must not resurrect the behaviour');
+  assert.equal(deadLetters()[0].reason, 'no_session');
+  assert.match(deadLetters()[0].detail ?? '', /Configure > Instances/, 'the dead letter must name the fix');
 });
 
 test('the handler returns without waiting for the sends — the 5 s dispatch budget is never at risk', async () => {

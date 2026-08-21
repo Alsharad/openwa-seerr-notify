@@ -40,6 +40,9 @@ export interface SetupInstance {
 
 /** Everything the plugin writes for the Setup tab. Written whole, so callers merge before writing. */
 export interface SetupState {
+  /** The running plugin version. Written on every pass, so the panel can state it even when the update
+   *  check has never run — or has been switched off. */
+  version: string;
   instances: SetupInstance[];
   instancesAt: string;
   /** Plaintext ingress secret from the last rotation, until the operator clears it. */
@@ -55,6 +58,7 @@ export interface SetupState {
 }
 
 export const EMPTY_SETUP: SetupState = {
+  version: '',
   instances: [],
   instancesAt: '',
   secret: '',
@@ -70,6 +74,7 @@ export function readSetup(raw: unknown): SetupState {
   const row = (raw ?? {}) as Record<string, unknown>;
   const str = (v: unknown): string => (typeof v === 'string' ? v : '');
   return {
+    version: str(row.version),
     instances: Array.isArray(row.instances) ? (row.instances as SetupInstance[]) : [],
     instancesAt: str(row.instancesAt),
     secret: str(row.secret),
@@ -180,7 +185,7 @@ export async function runSetupAction(
   action: SetupAction,
 ): Promise<SetupRunResult> {
   const now = deps.now ?? (() => new Date());
-  const state: SetupState = { ...previous, lastAction: action.token, error: '' };
+  const state: SetupState = { ...previous, version: deps.version, lastAction: action.token, error: '' };
   let message = '';
 
   try {
@@ -239,7 +244,10 @@ export async function refreshSetupInBackground(
 ): Promise<SetupState | null> {
   const now = deps.now ?? (() => new Date());
   const state: SetupState = { ...previous };
-  let changed = false;
+  // A version that has moved is itself worth a write: it is how the panel reports the running build
+  // after an upgrade, without waiting for a release check that may be switched off.
+  let changed = state.version !== deps.version;
+  state.version = deps.version;
 
   try {
     state.instances = await discoverInstances(deps);

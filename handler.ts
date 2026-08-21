@@ -164,13 +164,16 @@ export async function handleSeerrWebhook(deps: HandlerDeps, req: WebhookRequest)
 
   const event = normalizePayload(validated.value);
 
-  const sessionId = req.sessionId ?? deps.config.fallbackSessionId;
+  // Which session to send from is the host's to decide: bind the ingress instance to one (Configure →
+  // Instances). A plugin-side fallback was a second answer to a question the host already answers, and
+  // silently sending from a different session than the instance names is worse than failing here.
+  const sessionId = req.sessionId;
   if (!sessionId) {
     await recordDeadLetter(deadLetterDeps(deps), {
       reason: 'no_session',
       eventType: event.notificationType,
       deliveryId: req.deliveryId,
-      detail: 'ingress instance is not bound to a session and no fallbackSessionId is set',
+      detail: 'the ingress instance is not bound to a WhatsApp session — bind it under Configure > Instances',
     });
     deps.log('seerr-notify: no session to send from', { deliveryId: req.deliveryId });
     return;

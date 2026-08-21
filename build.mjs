@@ -41,6 +41,12 @@ const top = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf8').match(
 if (!top) fail('CHANGELOG.md has no released "## [x.y.z] — YYYY-MM-DD" heading');
 if (top[1] !== manifest.version) fail(`version drift: manifest ${manifest.version}, CHANGELOG ${top[1]}`);
 
+// package.json is not shipped in the zip, but it is what `npm version`, the repo listing and every tool
+// that reads a package report. It sat at 1.5.0 through three releases before anyone noticed, so it is a
+// gate now rather than a thing to remember.
+const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+if (pkg.version !== manifest.version) fail(`version drift: manifest ${manifest.version}, package.json ${pkg.version}`);
+
 // ── Build ────────────────────────────────────────────────────────────────────
 await mkdir(join(ROOT, 'dist'), { recursive: true });
 // Pins CommonJS so Node loads the bundle correctly even though this package is ESM.

@@ -201,7 +201,6 @@ are listed because they are what the REST API and any backup will show you.
 | `jellyseerrUrl` | **yes** | `""` | Seerr base URL. See *Reaching a self-hosted Seerr*. |
 | `jellyseerrApiKey` | **yes** | `""` | Seerr API key (stored masked). Reads the user list, and fills notifications out. |
 | `requireMappedUser` | no | `true` | On: an event matching nobody is recorded as a delivery failure. Off: dropped quietly. |
-| `fallbackSessionId` | no | `""` | Session to send from when the ingress instance is not bound to one. |
 | `sendPoster` | no | `true` | Attach the poster to `MEDIA_AVAILABLE` / `MEDIA_PENDING`. |
 | `routing` | no | *(defaults)* | Per-event delivery rules — `{ EVENT: { user, admin, adminInfo } }`. Edited in **Who gets what**; unset events use the shipped defaults. |
 | `seerrRoster` | no | `[]` | Cached Seerr accounts (`{ id, name, email, isAdmin }`) so the editor can list them. Written by the Refresh button or `refresh-roster.mjs`. |

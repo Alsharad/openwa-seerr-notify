@@ -54,11 +54,9 @@ export interface SeerrConfig {
   /** URL and key are both present. Separates "switched off" from "never filled in" in health output. */
   jellyseerrConfigured: boolean;
   requireMappedUser: boolean;
-  fallbackSessionId?: string;
   users: SeerrUser[];
-  /** Cached Seerr accounts, refreshed out-of-band by refresh-roster.mjs. */
+  /** Cached Seerr accounts, refreshed by the Recipients tab or refresh-roster.mjs. */
   roster: RosterEntry[];
-  rosterSyncedAt: string;
   /** Per-event delivery rules, defaulted from DEFAULT_ROUTING. */
   routing: RoutingTable;
   sendPoster: boolean;
@@ -173,16 +171,13 @@ export function readConfig(raw: Record<string, unknown>): SeerrConfig {
   }
 
   const seerr = readSeerrConnection(raw);
-  const fallbackSessionId = str(raw.fallbackSessionId);
 
   return {
     jellyseerr: { url: seerr.url, apiKey: seerr.apiKey, enabled: seerr.enabled },
     jellyseerrConfigured: seerr.configured,
     requireMappedUser: bool(raw.requireMappedUser, true),
-    fallbackSessionId: fallbackSessionId || undefined,
     users,
     roster,
-    rosterSyncedAt: str(raw.rosterSyncedAt),
     routing: readRouting(raw.routing),
     sendPoster: bool(raw.sendPoster, true),
     flags: ALL_SECTIONS,

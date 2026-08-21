@@ -301,6 +301,22 @@ test('a secret being replaced is never left on screen to be copied', () => {
 
   // The repaint has to happen at both ends: on press (so the stale value goes immediately) and when the
   // action settles (so success reveals the new secret, and failure restores the old one).
-  assert.match(/function requestSetup\([\s\S]*?\n  \}/.exec(html)[0], /renderSetup\(\);/);
-  assert.match(/function finishSetup\(\) \{[\s\S]*?\n  \}/.exec(html)[0], /renderSetup\(\);/);
+  const request = /function requestPlugin\([\s\S]*?\n  \}/.exec(html);
+  const finish = /function finishSetup\(\) \{[\s\S]*?\n  \}/.exec(html);
+  assert.ok(request && finish, 'could not find the request/finish pair that starts and ends a wait');
+  assert.match(request[0], /renderSetup\(\);/);
+  assert.match(finish[0], /renderSetup\(\);/);
+});
+
+test('every button that waits on the plugin waits the same way', () => {
+  // The roster refresh used to run its own path and tell the operator to reload the page, while the
+  // Setup buttons repainted themselves. One mechanism, one signal (`setup.lastAction`), one repaint.
+  const starts = [...html.matchAll(/requestPlugin\(([^,]+), '([a-z]+)'/g)].map((m) => m[2]);
+  const viaSetup = [...html.matchAll(/requestSetup\('([a-z]+)'/g)].map((m) => m[1]);
+  assert.deepEqual([...new Set(starts.concat(viaSetup))].sort(), ['instances', 'roster', 'secret', 'update']);
+
+  // The plugin has to echo the roster token the same way it echoes a Setup token, or the editor waits
+  // for a signal that never comes and falls back to "reload the dashboard".
+  const plugin = readFileSync(join(HERE, 'index.ts'), 'utf8');
+  assert.match(plugin, /lastAction: `roster\$\{'\$'\}\{token\}`|lastAction: `roster\|\$\{token\}`/);
 });

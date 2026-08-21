@@ -5,6 +5,7 @@ import { readDeadLetters } from './deadletter.ts';
 import { probeSeerr } from './probe.ts';
 import { API_KEY_FILE_CANDIDATES, refreshRoster } from './roster-refresh.ts';
 import { parseSetupAction, readSetup, refreshSetupInBackground, runSetupAction } from './setup.ts';
+import { writePluginConfig } from './gateway.ts';
 import type { SetupRunDeps } from './setup.ts';
 import { CHECK_INTERVAL_MS, repoSlug } from './update-check.ts';
 
@@ -252,6 +253,20 @@ export default class SeerrNotifyPlugin implements IPlugin {
 
       if (result.ok) ctx.logger.log(`seerr-notify: ${result.message}`);
       else ctx.logger.warn(`seerr-notify: roster refresh failed — ${result.message}`);
+
+      // Record the outcome the way every other button records it, so the editor has ONE landing signal
+      // to wait on rather than a special case per button — and so a failed refresh reports its reason in
+      // the panel instead of only in the gateway log.
+      const previous = readSetup((ctx.config as Record<string, unknown>).setup);
+      await writePluginConfig(
+        {
+          selfFetch: (target, init) => fetch(target, init as RequestInit),
+          readApiKey: readGatewayApiKey,
+          selfUrl: gatewaySelfUrl(),
+          pluginId: ctx.pluginId,
+        },
+        { setup: { ...previous, lastAction: `roster|${token}`, error: result.ok ? '' : result.message } },
+      ).catch((err) => ctx.logger.warn(`seerr-notify: could not record the refresh outcome — ${String(err)}`));
     } catch (err) {
       ctx.logger.error('seerr-notify: roster refresh threw', err);
     } finally {
@@ -281,11 +296,11 @@ export default class SeerrNotifyPlugin implements IPlugin {
     // an operator actually works in (connect Seerr, fetch the roster, map someone).
     const seerr = readSeerrConnection(ctx.config);
     if (!seerr.enabled) {
-      notes.push(
-        seerr.configured
-          ? 'Seerr enrichment is switched off; notifications send without media detail'
-          : 'no Seerr URL/API key configured; notifications send without media detail',
-      );
+      // Unhealthy, not a note: since 1.8.0 the connection is what the recipient list is built from, so an
+      // install without one cannot notify anybody. Reporting it as a degraded-but-fine state was left
+      // over from when enrichment was optional.
+      healthy = false;
+      notes.push('no Seerr URL/API key configured — open Configure > Connection and fill both in');
     } else {
       const probe = await probeSeerr({
         fetch: (url, init) => ctx.net.fetch(url, init),

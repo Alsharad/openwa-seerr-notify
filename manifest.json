@@ -1,7 +1,7 @@
 {
   "id": "seerr-notify",
   "name": "Seerr Notifications",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "type": "extension",
   "main": "dist/index.js",
   "description": "Deliver Overseerr/Jellyseerr request and issue notifications over WhatsApp, formatted per recipient.",
@@ -93,12 +93,6 @@
         "title": "Require a mapped user",
         "description": "On = an event resolving to no recipient is recorded as a dead letter instead of being dropped quietly.",
         "default": true
-      },
-      "fallbackSessionId": {
-        "type": "string",
-        "title": "Fallback WhatsApp session",
-        "description": "Session to send from when the ingress instance is not bound to one. Either bind the instance to a session or set this, otherwise nothing can be delivered.",
-        "default": ""
       },
       "users": {
         "type": "array",

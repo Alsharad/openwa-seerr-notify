@@ -244,9 +244,21 @@ test('the background pass checks GitHub at most once per interval', async () => 
 
 test('the background pass writes nothing when it has nothing', async () => {
   // No key file, no gateway, no update check — an install where the loopback write is unavailable must
-  // not write an empty state over whatever the operator already has.
+  // not write an empty state over whatever the operator already has. `version` already matches, so
+  // there is genuinely nothing new to record.
   const { deps, written } = harness({ '/api/integration/plugins/seerr-notify/instances': { status: 401 } });
-  const state = await refreshSetupInBackground(deps, EMPTY_SETUP, { checkUpdates: false, intervalMs: 1 });
+  const current = { ...EMPTY_SETUP, version: '1.6.0' };
+  const state = await refreshSetupInBackground(deps, current, { checkUpdates: false, intervalMs: 1 });
   assert.equal(state, null);
   assert.equal(written().length, 0);
+});
+
+test('a version that has moved is written on its own', async () => {
+  // How the panel reports the running build after an upgrade, without waiting for a release check that
+  // may be switched off — or a gateway that may not answer.
+  const { deps, written } = harness({ '/api/integration/plugins/seerr-notify/instances': { status: 401 } });
+  const stale = { ...EMPTY_SETUP, version: '1.5.0' };
+  const state = await refreshSetupInBackground(deps, stale, { checkUpdates: false, intervalMs: 1 });
+  assert.equal(state?.version, '1.6.0');
+  assert.equal(written().length, 1);
 });
