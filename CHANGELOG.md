@@ -6,6 +6,30 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.11.0] — 2026-08-21
+
+### Changed
+
+- **An install now reports that it finished, instead of telling you to reload and hope.** The worker that
+  starts an install does not survive it, so the token landing only ever meant *started*. The panel now
+  waits for the second landing — the replacement writing its own version and clearing the install marker
+  — and says **“Version 1.11.0 installed. Reload the dashboard to load it.”** The replacement reports in
+  ~1.5 s after an install rather than on the usual 10 s background pass, because a panel reading
+  “installing…” makes ten seconds of silence look like a hang.
+
+### Fixed
+
+- **The banner and Options contradicted each other**, one reading “you are running 1.9.0” while the other
+  said 1.10.1, two inches apart. The banner was reading `update.current` — the version that was running
+  when the *check* ran, which after an install is the old one. Everything now reads `setup.version`, the
+  running build, and a release equal to it is not offered as an update however stale the stored answer is.
+- **The banner sentence was spliced from three elements** with static text wedged between them, so an
+  install rendered as “Installing version 1.10.1 is out — you are running 1.10.1. — reload the dashboard
+  in a few seconds.” It is one string now, composed in one place.
+- **“Press again to install” never went away**, and ate the button’s icon on the way: `textContent =`
+  wipes child elements, and nothing rebuilt it. Both buttons now have their face rebuilt on every render.
+- Both install buttons hide while an install is running, so there is nothing to press twice.
+
 ## [1.10.2] — 2026-08-21
 
 ### Fixed

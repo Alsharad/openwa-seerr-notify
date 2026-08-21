@@ -32,6 +32,8 @@ const LAST_SETUP_KEY = 'last-setup-action';
  * populated before an operator who just installed the plugin gets there.
  */
 const BACKGROUND_SETUP_DELAY_MS = 10_000;
+/** The same pass, when a panel is waiting on it to confirm an install finished. */
+const INSTALL_REPORT_DELAY_MS = 1_500;
 
 /**
  * Read the gateway's own admin key from the file it seeds on first run. `node:fs` is reachable because
@@ -122,9 +124,18 @@ export default class SeerrNotifyPlugin implements IPlugin {
     // Populate the Setup tab and check for a new release, a few seconds from now so the gateway's own
     // HTTP listener is up. Detached and failure-tolerant: neither is worth delaying enable for, and a
     // host with no reachable key file simply leaves the tab to its manual buttons.
-    this.backgroundTimer = setTimeout(() => {
-      void this.backgroundSetup(ctx);
-    }, BACKGROUND_SETUP_DELAY_MS);
+    //
+    // Unless this worker IS the result of an install: then somebody is watching a panel that says
+    // "installing…", and the only thing that can tell them it finished is this pass writing the new
+    // version and clearing the marker. Ten seconds of silence reads as a hang, so it runs as soon as the
+    // gateway will answer.
+    const finishingInstall = readSetup((ctx.config as Record<string, unknown>).setup).upgradingTo !== '';
+    this.backgroundTimer = setTimeout(
+      () => {
+        void this.backgroundSetup(ctx);
+      },
+      finishingInstall ? INSTALL_REPORT_DELAY_MS : BACKGROUND_SETUP_DELAY_MS,
+    );
     this.backgroundTimer.unref?.();
 
     ctx.logger.log(`seerr-notify enabled (v${PLUGIN_VERSION})`);

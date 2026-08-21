@@ -351,3 +351,17 @@ test('an upgrade clears the banner without waiting for the next daily check', as
   assert.equal(state?.upgradingTo, '', 'and the install marker is cleared');
   assert.equal(written().length, 1);
 });
+
+test('the marker survives until the version it names is the one running', async () => {
+  // The editor waits on exactly this pair: version === target AND the marker cleared. Clearing it early
+  // — say on any enable — would report an install finished that had not happened.
+  const { deps } = harness({ '/api/integration/plugins/seerr-notify/instances': { body: [] } });
+  const midInstall = { ...EMPTY_SETUP, version: '1.5.0', upgradingTo: '9.9.9' };
+
+  const state = await refreshSetupInBackground(deps, midInstall, { checkUpdates: false, intervalMs: 1 });
+  assert.equal(state?.version, '1.6.0', 'the running version is recorded');
+  assert.equal(state?.upgradingTo, '9.9.9', 'but 1.6.0 is not the 9.9.9 that was asked for, so the wait continues');
+
+  const arrived = await refreshSetupInBackground(deps, { ...midInstall, upgradingTo: '1.6.0' }, { checkUpdates: false, intervalMs: 1 });
+  assert.equal(arrived?.upgradingTo, '', 'the version that was asked for is now running, so the install is done');
+});

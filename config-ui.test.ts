@@ -344,7 +344,16 @@ test('installing an update is offered only when there is one, and never unpinned
   // hands the gateway must carry the sha256 the RELEASE published, not one derived from the bytes just
   // downloaded, which would verify nothing.
   const script = html.split('<script>')[1];
-  assert.match(script, /var offer = !!\(update && update\.available\) && !installing;/);
+  assert.match(
+    script,
+    /var offer = !!\(update && update\.available && update\.latest !== running\) && !installing && !installed;/,
+    'a release equal to the running version is not an update, however stale the stored answer is',
+  );
+  assert.match(
+    script,
+    /var running = setup\.version \|\| \(update && update\.current\) \|\| '';/,
+    'the panel must state the RUNNING version, not the one that was running when the check ran',
+  );
   assert.match(script, /el\('installUpdate'\)\.hidden = !offer;/);
   assert.match(script, /el\('installUpdateOptions'\)\.hidden = !offer;/);
 

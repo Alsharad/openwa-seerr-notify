@@ -300,7 +300,7 @@
 </svg>
 
 <div id="updateBanner" hidden>
-  <span><b id="updateLatest"></b> is out — you are running <span id="updateCurrent" class="mono"></span>.<span id="updateNote"></span></span>
+  <span id="updateText"></span>
   <button type="button" class="btn" id="installUpdate">
     <svg width="13" height="13" aria-hidden="true"><use href="#i-download" /></svg>Install it
   </button>
@@ -544,7 +544,12 @@
    * value stays invisible until something makes it re-read. That is what waitForSetupResult does.
    */
   var pending = null;
+  /** Set once an install has been confirmed by the replacement worker; the banner reads it until reload. */
+  var installedVersion = '';
   var SETUP_POLL_MS = [2500, 5000, 9000];
+  /** An install downloads a package, swaps the worker and waits for the replacement to report in. */
+  var UPGRADE_POLL_MS = [2000, 3000, 4000, 6000, 8000, 10000];
+  function pollSchedule() { return pending && pending.action === 'upgrade' ? UPGRADE_POLL_MS : SETUP_POLL_MS; }
 
   var clock = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
   /** Intl throws a RangeError on an invalid Date, which would take the whole render down with it. */
@@ -576,6 +581,14 @@
    * whitespace text node before it. Swapping THAT left the original icon in place and appended a second
    * one — which is how the reveal button ended up showing two eyes.
    */
+  /** Rebuild a button's whole face — icon and text — so neither can be lost by setting the other. */
+  function setButtonLabel(button, iconName, text) {
+    button.textContent = '';
+    button.classList.remove('armed');
+    if (iconName) button.appendChild(icon(iconName, 13));
+    button.appendChild(document.createTextNode(text));
+  }
+
   function setIcon(button, name, size) {
     var next = icon(name, size);
     var current = button.querySelector('svg');
@@ -950,40 +963,52 @@
     if (generating) generate.disabled = true;
 
     var update = setup.update || null;
+    // `upgradingTo` is set by the worker that starts an install and cleared by the one that replaces it,
+    // so it — not a local flag — is what says an install is in flight, even across a page reload.
+    // `update.current` is the version that was running when the CHECK ran, so after an install it is the
+    // old one — which is how the banner came to read "1.10.1 is out — you are running 1.9.0" on a 1.10.1
+    // install, while Options said 1.10.1 two inches below. `setup.version` is the running build, written
+    // on every background pass, so it is what the whole panel reads; and a release equal to it is not an
+    // update however stale the stored answer is.
     var running = setup.version || (update && update.current) || '';
-    var checked = update ? at(update.checkedAt) : '';
-    var parts = [running ? 'Version ' + running : 'Version unknown'];
+    var installing = !!(setup.upgradingTo || (pending && pending.action === 'upgrade'));
+    var installed = installedVersion !== '';
+    var offer = !!(update && update.available && update.latest !== running) && !installing && !installed;
 
-    if (update && update.available) parts.push(update.latest + ' available');
-    else if (update && update.note) parts.push(update.note);
+    var banner = el('updateBanner');
+    banner.hidden = !offer && !installing && !installed;
+    if (installed) {
+      el('updateText').textContent = 'Version ' + installedVersion + ' is installed. Reload the dashboard to load it.';
+    } else if (installing) {
+      el('updateText').textContent = 'Installing version ' + (setup.upgradingTo || (pending && pending.target) || '') + '…';
+    } else if (offer) {
+      el('updateText').textContent = 'Version ' + update.latest + ' is out — you are running ' + running + '.';
+      el('updateLink').href = update.url;
+    }
+
+    el('installUpdate').hidden = !offer;
+    el('installUpdateOptions').hidden = !offer;
+    el('updateLink').hidden = installing || installed;
+    // textContent on an armed button wiped its icon, and nothing ever put it back. Rebuild both.
+    setButtonLabel(el('installUpdate'), 'i-download', 'Install it');
+    setButtonLabel(el('installUpdateOptions'), 'i-download', 'Install update');
+
+    // The same facts as the banner, in one line — so the two can never disagree.
+    var parts = [running ? 'Version ' + running : 'Version unknown'];
+    if (offer) parts.push(update.latest + ' available');
+    else if (installed) parts.push('installed ' + installedVersion + ', reload to load it');
+    else if (installing) parts.push('installing ' + (setup.upgradingTo || (pending && pending.target) || ''));
+    else if (update) parts.push(update.note || 'up to date');
     else parts.push('never checked');
+    var checked = update ? at(update.checkedAt) : '';
     if (checked) parts.push('checked ' + checked);
     if (!el('updateCheckEnabled').checked) parts.push('daily checks off');
     el('updateMeta').textContent = parts.join(' · ');
-
-    var installing = !!(setup.upgradingTo || (pending && pending.action === 'upgrade'));
-    var offer = !!(update && update.available) && !installing;
-
-    var banner = el('updateBanner');
-    banner.hidden = !(update && update.available) && !installing;
-    if (installing) {
-      el('updateLatest').textContent = 'Installing version ' + (setup.upgradingTo || (update || {}).latest || '');
-      el('updateCurrent').textContent = setup.version || '';
-      el('updateNote').textContent = ' — reload the dashboard in a few seconds.';
-    } else if (update && update.available) {
-      el('updateLatest').textContent = 'Version ' + update.latest;
-      el('updateCurrent').textContent = update.current;
-      el('updateNote').textContent = '';
-      el('updateLink').href = update.url;
-    }
-    el('installUpdate').hidden = !offer;
-    el('updateLink').hidden = installing;
-    el('installUpdateOptions').hidden = !offer;
   }
 
-  function requestSetup(action, arg, label) {
+  function requestSetup(action, arg, label, target) {
     setupToken = action + '|' + (arg || '') + '|' + new Date().toISOString();
-    requestPlugin(setupToken, action, label);
+    requestPlugin(setupToken, action, label, target);
   }
 
   /**
@@ -994,8 +1019,8 @@
    * repaint — a per-button special case is how the roster refresh ended up telling people to reload the
    * page while the Setup buttons updated themselves.
    */
-  function requestPlugin(token, action, label) {
-    pending = { token: token, action: action, label: label, tries: 0, phase: 'action' };
+  function requestPlugin(token, action, label, target) {
+    pending = { token: token, action: action, label: label, target: target || '', tries: 0, phase: 'action' };
     saveBtn.disabled = true;
     refreshBtn.disabled = true;
     setStatus(label, true);
@@ -1014,12 +1039,15 @@
    */
   function waitForSetupResult() {
     if (!pending) return;
-    if (pending.tries >= SETUP_POLL_MS.length) {
-      setStatus('Still running — reload the dashboard to see the result.', true);
+    var schedule = pollSchedule();
+    if (pending.tries >= schedule.length) {
+      setStatus(pending.action === 'upgrade'
+        ? 'The install did not report back. Reload the dashboard to see which version is running.'
+        : 'Still running — reload the dashboard to see the result.', true);
       finishSetup();
       return;
     }
-    var wait = SETUP_POLL_MS[pending.tries];
+    var wait = schedule[pending.tries];
     pending.tries += 1;
     setTimeout(function () {
       if (!pending) return;
@@ -1033,7 +1061,6 @@
 
   /** What to say once the plugin's answer lands — the next step, not "OK". */
   function setupDone(action) {
-    if (action === 'upgrade') return 'Installing — reload the dashboard in a few seconds.';
     if (action === 'roster') return 'Recipient list updated.';
     if (action === 'secret') return 'New secret ready — copy it into Seerr.';
     if (action === 'instances') return 'Instance list updated.';
@@ -1166,6 +1193,22 @@
         if (landed && setup.error) {
           setStatus(setup.error, false);
           finishSetup();
+        } else if (pending.action === 'upgrade') {
+          // An install has two landings, because the worker that starts it does not survive it. The
+          // token appearing means the install STARTED — everything after that is reported by the
+          // replacement, which writes its own version and clears the marker on its first pass. Waiting
+          // for that is the difference between "reload and see" and knowing it worked.
+          if (setup.version === pending.target && !setup.upgradingTo) {
+            installedVersion = pending.target;
+            setStatus('Version ' + installedVersion + ' installed. Reload the dashboard to load it.', true);
+            pending = null;
+            saveBtn.disabled = false;
+            refreshBtn.disabled = false;
+            renderSetup();
+          } else {
+            if (landed && pending.phase === 'action') setStatus('Installing version ' + pending.target + '…', true);
+            waitForSetupResult();
+          }
         } else if (landed) {
           setStatus(setupDone(pending.action), true);
           finishSetup();
@@ -1239,10 +1282,11 @@
   // confirm() to fall back on.
   var armedUpgrade = false;
   function armInstall(button) {
+    var update = setup.update || {};
     if (!armedUpgrade) {
       armedUpgrade = true;
+      setButtonLabel(button, '', 'Press again to install');
       button.classList.add('armed');
-      button.textContent = 'Press again to install';
       setStatus('This replaces the running plugin. Your settings are kept.', false);
       setTimeout(function () {
         if (!armedUpgrade) return;
@@ -1253,7 +1297,9 @@
       return;
     }
     armedUpgrade = false;
-    requestSetup('upgrade', '', 'Installing…');
+    // The version being installed is captured now: the check that named it is about to be replaced by
+    // the new worker's own, and the wait below needs something stable to compare against.
+    requestSetup('upgrade', '', 'Installing version ' + update.latest + '…', update.latest);
   }
   el('installUpdate').addEventListener('click', function () { armInstall(el('installUpdate')); });
   el('installUpdateOptions').addEventListener('click', function () { armInstall(el('installUpdateOptions')); });
