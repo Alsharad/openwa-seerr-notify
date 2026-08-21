@@ -324,3 +324,30 @@ test('an install with nothing newer to install says so', async () => {
   assert.equal(result.ok, false);
   assert.match(result.message, /no newer release/);
 });
+
+test('an upgrade clears the banner without waiting for the next daily check', async () => {
+  // The stored check was answered against the version running at the time. After an in-place upgrade
+  // that is the OLD version, so the banner would keep offering a release already installed — "1.10.1 is
+  // available (running 1.10.1)" — until the daily throttle let another check through.
+  const { deps, written } = harness({
+    '/api/integration/plugins/seerr-notify/instances': { body: [] },
+  });
+  const justUpgraded = {
+    ...EMPTY_SETUP,
+    version: '1.5.0',
+    upgradingTo: '1.6.0',
+    update: {
+      current: '1.5.0', latest: '1.6.0', url: 'u', checkedAt: '2026-08-21T11:59:00.000Z',
+      available: true, note: '', asset: 'a', sha256: 'b'.repeat(64),
+    },
+  };
+
+  // Inside the throttle window, so no network check runs — this has to be decided locally.
+  const state = await refreshSetupInBackground(deps, justUpgraded, { checkUpdates: true, intervalMs: 24 * 60 * 60 * 1000 });
+  assert.equal(state?.update?.available, false, 'the release the plugin is now running is not an update');
+  assert.equal(state?.update?.current, '1.6.0');
+  assert.equal(state?.update?.note, 'up to date');
+  assert.equal(state?.update?.latest, '1.6.0', 'the fetched result is re-decided, not discarded');
+  assert.equal(state?.upgradingTo, '', 'and the install marker is cleared');
+  assert.equal(written().length, 1);
+});

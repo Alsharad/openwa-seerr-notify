@@ -20,7 +20,7 @@
 
 import { gatewayRequest, writePluginConfig } from './gateway.ts';
 import type { GatewayDeps } from './gateway.ts';
-import { checkForUpdate, pinnedDownloadUrl } from './update-check.ts';
+import { checkForUpdate, isNewer, pinnedDownloadUrl } from './update-check.ts';
 import type { UpdateState } from './update-check.ts';
 import type { NetFetch } from './seerr-client.ts';
 
@@ -322,6 +322,21 @@ export async function refreshSetupInBackground(
   // that an install finished: the process that started it did not survive to report anything.
   if (state.upgradingTo && state.upgradingTo === deps.version) {
     state.upgradingTo = '';
+    changed = true;
+  }
+
+  // A stored check was answered against whatever version was running when it ran. After an upgrade that
+  // is the OLD version, so the banner would go on offering a release that is already installed until the
+  // next daily check came round. Re-decide against the version actually running — same fetched `latest`,
+  // no network call, so it costs nothing and cannot be skipped by the throttle.
+  if (state.update && state.update.current !== deps.version) {
+    const available = isNewer(state.update.latest, deps.version);
+    state.update = {
+      ...state.update,
+      current: deps.version,
+      available,
+      note: available ? '' : 'up to date',
+    };
     changed = true;
   }
 

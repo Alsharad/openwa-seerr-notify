@@ -6,6 +6,17 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.10.2] — 2026-08-21
+
+### Fixed
+
+- **The update banner survived the update.** A stored check is answered against whatever version was
+  running when it ran — which, after an in-place install, is the old one. So the banner went on offering
+  a release that was already installed, and the log said “version 1.10.1 is available (running 1.10.1)”,
+  until the daily throttle let another check through. The background pass now re-decides the stored
+  result against the version actually running: same fetched `latest`, no network call, so the throttle
+  cannot skip it.
+
 ## [1.10.1] — 2026-08-21
 
 ### Fixed
