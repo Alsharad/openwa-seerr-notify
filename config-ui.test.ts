@@ -165,7 +165,7 @@ test('the Setup buttons stamp tokens the plugin actually acts on', () => {
   // The editor's only channel to the plugin is a token string in config. Both halves are written by
   // hand, in different languages, and neither compiler sees the other — so assert them against each other.
   const actions = [...html.matchAll(/requestSetup\('([^']+)'/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(actions)].sort(), ['update', 'upgrade']);
+  assert.deepEqual([...new Set(actions)].sort(), ['test', 'update', 'upgrade']);
 
   const stamp = /setupToken = action \+ '\|' \+ \(arg \|\| ''\) \+ '\|' \+ new Date\(\).toISOString\(\)/.test(html);
   assert.ok(stamp, 'the token format changed; parseSetupAction has to change with it');
@@ -294,7 +294,7 @@ test('every button that waits on the plugin waits the same way', () => {
   // Setup buttons repainted themselves. One mechanism, one signal (`setup.lastAction`), one repaint.
   const starts = [...html.matchAll(/requestPlugin\(([^,]+), '([a-z]+)'/g)].map((m) => m[2]);
   const viaSetup = [...html.matchAll(/requestSetup\('([a-z]+)'/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(starts.concat(viaSetup))].sort(), ['roster', 'update', 'upgrade']);
+  assert.deepEqual([...new Set(starts.concat(viaSetup))].sort(), ['roster', 'test', 'update', 'upgrade']);
 
   // The plugin has to echo the roster token the same way it echoes a Setup token, or the editor waits
   // for a signal that never comes and falls back to "reload the dashboard".

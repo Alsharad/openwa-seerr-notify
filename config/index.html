@@ -503,9 +503,15 @@
       on — the same rule that stops a retry from messaging people twice.
     </p>
     <p class="hint">
-      Use the <b>health check</b> on this plugin’s row instead: it reports the Seerr version and which
-      WhatsApp session notifications will go out from. A real request in Seerr is the other honest test.
+      Use the button below instead — it sends a real WhatsApp message through the same code a Seerr
+      notification uses, as often as you like. It skips the webhook hop itself; the <b>health check</b> on
+      this plugin’s row covers that, and reports which session messages go out from.
     </p>
+    <div class="rail">
+      <span class="tag">Test</span>
+      <span class="rail-value" id="testResult">Not sent yet</span>
+      <button type="button" class="btn" id="sendTest">Send a test message</button>
+    </div>
   </div>
 
   <div class="rail">
@@ -885,6 +891,13 @@
     // this page a cache that went stale the moment an instance was created, and no amount of refreshing
     // on our side could fix that — the editor has no network, so it can only ever show what was written
     // the last time the plugin ran. What remains is the update banner, which IS this plugin's own state.
+    // Blanked while a press is in flight, so a result from the PREVIOUS press cannot be read as this
+    // one's — the same reason the secret field used to be cleared during a rotation.
+    el('testResult').textContent = pending && pending.action === 'test'
+      ? 'Sending…'
+      : setup.testResult || 'Not sent yet';
+    el('sendTest').disabled = !!pending;
+
     var update = setup.update || null;
     var running = setup.version || (update && update.current) || '';
     var installing = !!(setup.upgradingTo || (pending && pending.action === 'upgrade'));
@@ -987,6 +1000,7 @@
 
   /** What to say once the plugin's answer lands — the next step, not "OK". */
   function setupDone(action) {
+    if (action === 'test') return setup.testResult || 'Test message sent.';
     if (action === 'roster') return 'Recipient list updated.';
     if (action === 'secret') return 'New secret ready — copy it into Seerr.';
     if (action === 'instances') return 'Instance list updated.';
@@ -1211,6 +1225,10 @@
     el('copyApiKey').disabled = empty;
   });
   el('updateCheckEnabled').addEventListener('change', renderSetup);
+  el('sendTest').addEventListener('click', function () {
+    requestSetup('test', '', 'Sending a test message…');
+  });
+
   el('checkUpdate').addEventListener('click', function () {
     requestSetup('update', '', 'Asking GitHub for the latest release…');
   });

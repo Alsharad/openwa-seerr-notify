@@ -57,6 +57,7 @@ function harness(routes: Record<string, { status?: number; body?: unknown }> = {
     }),
     repoSlug: 'o/r',
     version: '1.6.0',
+    runTest: async () => ({ ok: true, message: 'test message sent to 1 recipient(s): ***0001@c.us' }),
     now: NOW,
   };
   return { deps, calls, written: () => calls.filter((c) => c.url.endsWith('/api/plugins/seerr-notify/config')) };

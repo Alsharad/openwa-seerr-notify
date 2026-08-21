@@ -200,3 +200,24 @@ export async function describeSending(deps: SessionLookupDeps): Promise<{ ok: bo
   if (problems.length > 0) return { ok: false, note: problems.join(' ') };
   return { ok: true, note: `Sending from ${[...sending].map((n) => `"${n}"`).join(', ')}.` };
 }
+
+/**
+ * The session a test message should go out from.
+ *
+ * A test is not tied to an ingress instance — nothing posted it — but it must land where a real delivery
+ * would, or it proves the wrong thing. So it borrows the binding from the first enabled instance that has
+ * one and resolves from there, which collapses to the same single-ready-session rule when none does.
+ */
+export async function resolveSessionForTest(deps: SessionLookupDeps): Promise<SessionChoice> {
+  let bound: string | undefined;
+  try {
+    const res = await gatewayRequest(deps, `/api/integration/plugins/${deps.pluginId}/instances`);
+    if (res.ok) {
+      bound = parseInstances(res.body).filter((i) => i.enabled).find((i) => i.sessionScope)?.sessionScope ?? undefined;
+    }
+  } catch {
+    // An unreadable instance list is not fatal here: with no binding to honour, the single-ready-session
+    // rule is exactly what a real delivery would fall back to anyway.
+  }
+  return resolveSessionId(deps, bound);
+}

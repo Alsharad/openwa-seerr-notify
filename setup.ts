@@ -44,6 +44,8 @@ export interface SetupState {
   update: UpdateState | null;
   /** Version an install was started for, so the panel can say what is being installed. */
   upgradingTo: string;
+  /** What the last "Send a test message" press did, rendered under the button. */
+  testResult: string;
   /** Echoes the token that produced this state — how the editor knows its click landed. */
   lastAction: string;
   /** Empty on success; the reason on failure, rendered in the editor. */
@@ -55,6 +57,7 @@ export const EMPTY_SETUP: SetupState = {
   seerrApiKey: '',
   update: null,
   upgradingTo: '',
+  testResult: '',
   lastAction: '',
   error: '',
 };
@@ -68,13 +71,14 @@ export function readSetup(raw: unknown): SetupState {
     seerrApiKey: str(row.seerrApiKey),
     update: (row.update ?? null) as UpdateState | null,
     upgradingTo: str(row.upgradingTo),
+    testResult: str(row.testResult),
     lastAction: str(row.lastAction),
     error: str(row.error),
   };
 }
 
 export interface SetupAction {
-  name: 'update' | 'upgrade';
+  name: 'update' | 'upgrade' | 'test';
   /** The instance id, for `secret`. Empty otherwise. */
   arg: string;
   /** The whole token, echoed back so the write cannot loop and the editor can confirm the round trip. */
@@ -91,7 +95,7 @@ export interface SetupAction {
 export function parseSetupAction(raw: unknown): SetupAction | null {
   if (typeof raw !== 'string' || raw === '') return null;
   const [name, arg = ''] = raw.split('|');
-  if (name !== 'update' && name !== 'upgrade') return null;
+  if (name !== 'update' && name !== 'upgrade' && name !== 'test') return null;
   return { name, arg, token: raw };
 }
 
@@ -103,6 +107,8 @@ export interface SetupRunDeps extends GatewayDeps {
   /** Baked from manifest.repository at build time. */
   repoSlug: string;
   version: string;
+  /** Sends one test notification through the real delivery pipeline — see test-send.ts. */
+  runTest: () => Promise<{ ok: boolean; message: string }>;
   now?: () => Date;
 }
 
@@ -133,6 +139,14 @@ export async function runSetupAction(
   try {
     if (action.name === 'upgrade') {
       return await installUpdate(deps, state, action);
+    } else if (action.name === 'test') {
+      const result = await deps.runTest();
+      // Recorded either way. A test that found nobody to send to is the most useful thing this button can
+      // report, and burying it in `error` would render it as a failure of the button rather than of the
+      // configuration it is testing.
+      state.testResult = result.message;
+      if (!result.ok) state.error = result.message;
+      message = result.message;
     } else {
       state.update = await checkForUpdate(deps.netFetch, deps.repoSlug, deps.version, now);
       message = state.update.available

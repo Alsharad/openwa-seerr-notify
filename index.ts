@@ -1,7 +1,11 @@
 import type { IPlugin, PluginContext } from './types/openwa';
 import { readConfig, readSeerrConnection } from './config.ts';
+import type { SeerrConfig } from './config.ts';
 import { handleSeerrWebhook } from './handler.ts';
-import { describeSending, resolveSessionId } from './session-resolve.ts';
+import { describeSending, resolveSessionForTest, resolveSessionId } from './session-resolve.ts';
+import { sendTestMessage } from './test-send.ts';
+import type { GatewayDeps } from './gateway.ts';
+import type { HandlerDeps } from './handler.ts';
 import { readDeadLetters } from './deadletter.ts';
 import { probeSeerr } from './probe.ts';
 import { API_KEY_FILE_CANDIDATES, refreshRoster } from './roster-refresh.ts';
@@ -169,7 +173,52 @@ export default class SeerrNotifyPlugin implements IPlugin {
       netFetch: (target, init) => ctx.net.fetch(target, init),
       repoSlug: repoSlug(PLUGIN_REPO),
       version: PLUGIN_VERSION,
+      runTest: () => this.runTest(ctx),
     };
+  }
+
+  /** Everything a delivery needs from the host, shared by the ingress route and the test button. */
+  private handlerDeps(ctx: PluginContext, config: SeerrConfig): HandlerDeps {
+    return {
+      config,
+      net: (url, init) => ctx.net.fetch(url, init),
+      send: (env) => ctx.conversations.send(env),
+      storage: ctx.storage,
+      log: (message, meta) => ctx.logger.warn(message, meta),
+      sleep,
+      resolveSession: (bound) => resolveSessionId(this.gatewayDeps(ctx), bound),
+    };
+  }
+
+  private gatewayDeps(ctx: PluginContext): GatewayDeps {
+    return {
+      selfFetch: (target, init) => fetch(target, init as RequestInit),
+      readApiKey: readGatewayApiKey,
+      selfUrl: gatewaySelfUrl(),
+      pluginId: ctx.pluginId,
+    };
+  }
+
+  /**
+   * "Send a test message", which deliberately does not go through ingress — see test-send.ts for why
+   * Seerr's own Test button cannot be made to work twice.
+   */
+  private async runTest(ctx: PluginContext): Promise<{ ok: boolean; message: string }> {
+    let config: SeerrConfig;
+    try {
+      config = readConfig(ctx.config);
+    } catch (err) {
+      return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
+
+    const choice = await resolveSessionForTest(this.gatewayDeps(ctx));
+    if (!choice.ok) return { ok: false, message: choice.detail };
+
+    return sendTestMessage({
+      handler: this.handlerDeps(ctx, config),
+      sessionId: choice.sessionId,
+      deliveryId: `setup-test-${new Date().toISOString()}`,
+    });
   }
 
   /**

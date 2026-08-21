@@ -6,6 +6,29 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-08-21
+
+### Added
+
+- **A "Send a test message" button on the Setup tab**, because Seerr's own Test button cannot be made to
+  work twice. OpenWA dedupes ingress on `(pluginId, instanceId, providerDeliveryId)` behind a UNIQUE
+  constraint, and with no delivery-id header from the provider that id is
+  `sha256(pluginId ∥ instanceId ∥ route ∥ rawBody)`. A Seerr test payload carries no id and no timestamp,
+  so every press is byte-identical and the second one onward is answered `200 duplicate` before this
+  plugin is invoked — while Seerr still reports success. There is no setting on either side that changes
+  it: the dedup has no per-route opt-out, and Seerr sends no header whose value varies.
+
+  So the button does not go through ingress at all. It is not a webhook, so there is nothing to dedupe.
+  It runs the same `processEvent` a real delivery runs — session resolution, recipient routing, message
+  formatting, retrying send — using the payload captured byte-for-byte from a live Seerr test press, and
+  reports which masked chat ids it reached. What it does not cover is the webhook hop itself, the URL and
+  the Authorization header; a real Seerr notification proves that, and the health check reports on it.
+
+  It reports "nobody to send a test to" as a configuration problem rather than a failure of the button:
+  a test is routed to admins, so the usual cause is that nobody ticked on the Recipients tab is a Seerr
+  admin.
+
+
 ## [1.19.0] - 2026-08-21
 
 ### Fixed
