@@ -11,7 +11,7 @@ import { ALL_SECTIONS, readConfig } from './config.ts';
 import { normalizePayload } from './normalize.ts';
 import { resolveRecipients } from './recipients.ts';
 import { formatMessages } from './formatter.ts';
-import { DEFAULT_ROUTING, ROUTED_EVENTS, routingFor, supportsAdminInfo } from './routing.ts';
+import { DEFAULT_ROUTING, ROUTED_EVENTS, routingFor, supportsAdminInfo, supportsRequester } from './routing.ts';
 import { parseSetupAction } from './setup.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -414,4 +414,22 @@ test('the Setup tab is a static guide, not a mirror of the Instances tab', () =>
   for (const gone of ['webhookUrl', 'ingressSecret', 'generateSecret', 'instanceList', 'curl']) {
     assert.doesNotMatch(panel[0], new RegExp(gone), `${gone} belongs to the Instances tab, not here`);
   }
+});
+
+
+test('a cell that cannot apply is never rendered as a toggle, and never as an off toggle', () => {
+  const html = readFileSync(new URL('./config/index.html', import.meta.url), 'utf8');
+
+  // Both helpers must exist in the editor, and the renderer must route every column through them —
+  // TEST_NOTIFICATION's User cell was a live toggle that could not match anyone, because a test payload
+  // names no requester.
+  assert.match(html, /function supportsRequester\(/, 'the editor must know which rows have no requester');
+  assert.match(html, /if \(!applies\(event, key\)\)/, 'every column must go through the same test');
+
+  // "cannot apply" and "switched off" were both an em dash, so a dead cell read as a disabled one.
+  assert.match(html, /na\.textContent = 'n\/a'/, 'the not-applicable marker must differ from an off toggle');
+
+  assert.equal(supportsRequester('TEST_NOTIFICATION'), false);
+  assert.equal(supportsRequester('MEDIA_PENDING'), true);
+  assert.equal(supportsAdminInfo('TEST_NOTIFICATION'), false);
 });

@@ -49,7 +49,15 @@ function toRecipient(user: SeerrUser, source: RecipientSource): Recipient {
   };
 }
 
-/** First entry per chat id wins, so a requester who is also an admin keeps the richer admin message. */
+/**
+ * First entry per chat id wins.
+ *
+ * The requester is pushed before the admins, so someone who requested the item AND is an admin is kept as
+ * the REQUESTER and gets the plain message, not the admin one with its Admin Info block. That is the
+ * right way round — they are being told about their own request, and the block would only repeat back
+ * details they submitted — but the comment here used to claim the opposite, which made the code look
+ * broken to anyone checking.
+ */
 function dedupe(recipients: Recipient[]): Recipient[] {
   const seen = new Set<string>();
   const out: Recipient[] = [];

@@ -6,6 +6,30 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-08-21
+
+### Fixed
+
+- **The "Who gets what" table no longer offers a control that cannot do anything.** `TEST_NOTIFICATION`'s
+  **User** cell was a live toggle, but a test payload names no requester, so `matchUser` can never resolve
+  one and the setting was decorative in either position. It now renders as not-applicable, the way the
+  Admin info cell for that row already did.
+- **Not-applicable and switched-off are no longer the same glyph.** Both rendered as a dash, so a cell
+  that *cannot* apply looked like one somebody had turned off. Not-applicable now reads `n/a`.
+- Corrected the recipient de-duplication comment, which claimed the opposite of what the code does: a
+  requester who is also an admin is kept as the **requester** and gets the plain message. That is the
+  right way round — they are being told about their own request — but the comment made correct code look
+  broken.
+
+### Documentation
+
+- **Setup** now says that Seerr's **Test Notification** button works exactly once, and what to use
+  instead. OpenWA answers a repeat of a byte-identical delivery with `200 duplicate` before the plugin is
+  ever invoked, and a Seerr test payload carries no id and no timestamp, so every press after the first is
+  silently dropped while Seerr still reports success. The README had documented this since the test rig
+  was written; the GUI, which is what an operator actually reads, had not.
+
+
 ## [1.18.0] - 2026-08-21
 
 ### Fixed

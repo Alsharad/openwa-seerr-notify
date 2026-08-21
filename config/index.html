@@ -237,7 +237,7 @@
   }
   td.mark button[aria-pressed="true"] { color: var(--accent); font-weight: 700; }
   td.mark button:hover { background: var(--accent-soft); }
-  td.mark .na { color: var(--edge); }
+  td.mark .na { color: var(--edge); font-size: 11px; letter-spacing: .02em; }
 
   /* ── Update banner ────────────────────────────────────────────────────── */
   #updateBanner {
@@ -495,6 +495,19 @@
     </ul>
   </div>
 
+  <div class="card">
+    <h3>3 · Checking it works</h3>
+    <p class="hint">
+      Seerr’s <b>Test Notification</b> button works <b>once</b>. Its payload is identical every press, and
+      OpenWA answers a repeat of an identical delivery with <code>200 duplicate</code> without passing it
+      on — the same rule that stops a retry from messaging people twice.
+    </p>
+    <p class="hint">
+      Use the <b>health check</b> on this plugin’s row instead: it reports the Seerr version and which
+      WhatsApp session notifications will go out from. A real request in Seerr is the other honest test.
+    </p>
+  </div>
+
   <div class="rail">
     <span class="tag">Full guide</span>
     <a class="rail-link" id="repoLink" href="https://github.com/Alsharad/openwa-seerr-notify#setup" rel="noopener noreferrer">
@@ -698,6 +711,13 @@
   var ROUTED_EVENTS = Object.keys(DEFAULT_ROUTING);
   /** A test carries no requester and no ids, so an Admin info block would be an empty heading. */
   function supportsAdminInfo(event) { return event !== 'TEST_NOTIFICATION'; }
+  /** A test names nobody, so "the requester" can never resolve — the toggle would be decorative. */
+  function supportsRequester(event) { return event !== 'TEST_NOTIFICATION'; }
+  function applies(event, key) {
+    if (key === 'adminInfo') return supportsAdminInfo(event);
+    if (key === 'user') return supportsRequester(event);
+    return true;
+  }
 
   var COLUMN_LABEL = { user: 'the requester', admin: 'admins', adminInfo: 'the admin info block' };
   var routing = {};
@@ -722,11 +742,15 @@
         var td = document.createElement('td');
         td.className = 'mark';
 
-        if (key === 'adminInfo' && !supportsAdminInfo(event)) {
+        if (!applies(event, key)) {
+          // Distinct from an off toggle, which is also a dash: "cannot apply" and "switched off" were
+          // the same glyph, so a dead cell read as a cell someone had turned off.
           var na = document.createElement('span');
           na.className = 'na';
-          na.textContent = '—';
-          na.title = 'This event carries nothing to put in an admin info block';
+          na.textContent = 'n/a';
+          na.title = key === 'user'
+            ? 'A test names no requester, so this can never match anyone'
+            : 'This event carries nothing to put in an admin info block';
           td.appendChild(na);
         } else {
           var toggle = document.createElement('button');

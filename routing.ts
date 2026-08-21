@@ -64,6 +64,18 @@ export function supportsAdminInfo(eventType: string): boolean {
 }
 
 /**
+ * Can this event reach "the requester" at all?
+ *
+ * A test payload names nobody — no requester, no reporter — so `matchUser` can never resolve one and the
+ * User column is dead for that row no matter what it is set to. It was still rendered as a live toggle,
+ * which is the same defect the Admin info column already avoids: a control that cannot do anything must
+ * not look like one that can.
+ */
+export function supportsRequester(eventType: string): boolean {
+  return eventType !== 'TEST_NOTIFICATION' && DEFAULT_ROUTING[eventType] !== undefined;
+}
+
+/**
  * Merge stored routing over the defaults. Unknown event types are ignored and missing cells fall back,
  * so a config written by an older version — or one hand-edited into a partial state — still resolves to
  * complete, valid routing.

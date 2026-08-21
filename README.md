@@ -234,6 +234,10 @@ The banner shows the URL rather than a clickable link: the config screen is a sa
 
 ### Testing it
 
+> **If you pressed Seerr's Test button and nothing arrived, this is why — it works once.** The quickest
+> honest check is the health-check button on the plugin's row, which reports the Seerr version and the
+> session notifications will send from.
+
 Seerr's own **Test Notification** button is a poor test rig: it only ever sends `TEST_NOTIFICATION`, so
 it exercises none of the formatting that matters, and its payload is byte-identical every time — which
 collides with OpenWA's ingress de-duplication (no delivery-id header ⇒ the id is a hash of the body), so
