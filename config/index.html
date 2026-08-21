@@ -884,8 +884,10 @@
       var note = document.createElement('div');
       note.className = 'note';
       note.innerHTML =
-        '<b>No ingress instance yet</b> — Seerr has nowhere to post. Run this on the OpenWA host, then ' +
-        'press Check again. It returns a secret too, so you can skip the next step.';
+        '<b>No ingress instance yet</b> — this is the address Seerr posts to, and nothing here works ' +
+        'without one. Create it on the <b>Instances</b> tab of this window: an id (<code>seerr-prod</code> ' +
+        'does fine), the WhatsApp session to send from, and it shows you the secret. Then press Check ' +
+        'again — you can skip the secret step below, since that one is the same secret.';
       list.appendChild(note);
 
       var command = "curl -sX POST http://<openwa-host>:<openwa-port>/api/integration/plugins/seerr-notify/instances " +
@@ -896,7 +898,7 @@
 
       var tag = document.createElement('span');
       tag.className = 'tag';
-      tag.textContent = 'Run';
+      tag.textContent = 'Or run';
 
       var value = document.createElement('span');
       value.className = 'value';

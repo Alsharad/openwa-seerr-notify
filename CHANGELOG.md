@@ -22,6 +22,19 @@ All notable changes to this plugin are documented here. The format follows
 - Removed the instruction to reload the page after Refresh from Seerr; the list has repainted in place
   since 1.9.0. Host placeholders read `<openwa-host>:<openwa-port>` everywhere, matching the panel.
 
+## [1.15.4] — 2026-08-21
+
+### Fixed
+
+- **“No ingress instance yet” sent people to a terminal for something the dashboard has a form for.**
+  OpenWA's own **Instances** tab — in the same window as this panel, two tabs across — creates one from
+  an id, a session picker and a secret it shows once. The Setup tab was handing out a `curl` command with
+  an admin API key instead, which is how a first-time user got stuck on that message.
+
+  It now says what an instance is (the address Seerr posts to), names the tab that makes one, and notes
+  that the secret it shows is the same secret, so the Generate step below can be skipped. The `curl` is
+  still there for anyone driving the API, relabelled *Or run*. The README step matches.
+
 ## [1.15.3] — 2026-08-21
 
 ### Documentation

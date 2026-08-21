@@ -437,3 +437,14 @@ test('saving is never gated or answered as a failure', () => {
   assert.doesNotMatch(handler[0], /return;/, 'the save must have no early exit');
   assert.doesNotMatch(handler[0], /setStatus\([^)]*, false\)/, 'a completed save must not answer in red');
 });
+
+test('the no-instance state points at the tab that creates one', () => {
+  // OpenWA's own Instances tab creates these with a form — id, session, secret shown once. Handing the
+  // operator a curl command with an admin API key instead, two tabs away from the button, is how a
+  // first-time user got stuck on "No ingress instance yet".
+  const script = html.split('<script>')[1];
+  const empty = /No ingress instance yet[\s\S]{0,400}?';/.exec(script);
+  assert.ok(empty, 'could not find the empty-instance message');
+  assert.match(empty[0], /<b>Instances<\/b> tab/, 'name the tab that does it');
+  assert.match(empty[0], /session/, 'creating one needs a session, and the form asks for it');
+});

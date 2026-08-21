@@ -94,8 +94,11 @@ The full path:
    WhatsApp number.
 3. **Install and enable the plugin** (below). It enables with an empty config — there is nothing to
    configure before it is running, and the buttons that fetch things only work while it *is* running.
-4. **Provision an ingress instance**, if you have not got one. This is the one step with no button,
-   because it needs an admin API key the config screen never sees:
+4. **Create an ingress instance**, if you have not got one. This is the address Seerr posts to, and
+   nothing works without one. **Configure → Instances → Create** does it from the dashboard: give it an
+   id (`seerr-prod` is fine), pick the WhatsApp session to send from, and it shows you the secret once.
+
+   Or over the API, if you would rather:
 
    ```bash
    curl -X POST http://<openwa-host>:<openwa-port>/api/integration/plugins/seerr-notify/instances \
