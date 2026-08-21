@@ -332,6 +332,10 @@ test('a saved API key is neither shown nor wiped', () => {
     /apiKeySaved = cfg\.jellyseerrApiKey === SECRET_SENTINEL;[\s\S]*?if \(apiKeySaved\) el\('jellyseerrApiKey'\)\.value = '';/,
     'a redacted key must leave the field empty rather than displaying the sentinel',
   );
+  // An empty box is ambiguous, so the control has to say which state it is in — and not contradict
+  // itself while doing it.
+  assert.match(script, /el\('apiKeySavedPill'\)\.hidden = !apiKeySaved;/, 'a saved key must be visibly saved');
+  assert.match(script, /'saved — type a new key to replace it…'/, 'the placeholder must state the action, not deny the key');
   assert.match(
     script,
     /if \(cfg\.jellyseerrApiKey === '' && apiKeySaved\) cfg\.jellyseerrApiKey = SECRET_SENTINEL;/,

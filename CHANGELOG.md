@@ -6,6 +6,17 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.11.1] — 2026-08-21
+
+### Fixed
+
+- **A saved API key looked like a missing one.** The gateway redacts stored secrets before the config
+  reaches the panel, so the field is empty whether or not a key is saved — and it sat under a placeholder
+  reading “paste your Seerr API key…”, with a line of grey text below saying “A key is saved.” Two
+  elements telling opposite stories. The label now carries a **SAVED** badge, the placeholder states the
+  action (“saved — type a new key to replace it…”), and the line below goes back to its one job: where to
+  find the key in Seerr.
+
 ## [1.11.0] — 2026-08-21
 
 ### Changed

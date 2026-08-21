@@ -172,6 +172,8 @@
   /* ── Fields ───────────────────────────────────────────────────────────── */
   .field { margin-bottom: 12px; }
   .field > label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+  .field > label .pill { margin-left: 6px; vertical-align: 1px; }
+  .pill[hidden] { display: none; }
   .field small { display: block; color: var(--ink-dim); font-size: 11px; margin-top: 5px; }
   input[type="text"], input[type="password"], input[type="tel"], input[type="search"], select {
     width: 100%; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--ink);
@@ -328,10 +330,10 @@
              autocomplete="off" spellcheck="false" translate="no" placeholder="http://192.168.1.50:5055…" />
     </div>
     <div class="field">
-      <label for="jellyseerrApiKey">API key</label>
+      <label for="jellyseerrApiKey">API key <span class="pill" id="apiKeySavedPill" hidden>SAVED</span></label>
       <input type="password" id="jellyseerrApiKey" name="jellyseerrApiKey" class="mono"
              autocomplete="off" spellcheck="false" translate="no" placeholder="paste your Seerr API key…" />
-      <small id="apiKeyHint">Seerr → Settings → General → API Key</small>
+      <small>Seerr → Settings → General → API Key</small>
     </div>
     <p class="hint">Test them with the health check on the plugin row.</p>
   </div>
@@ -1083,11 +1085,16 @@
     var cfg = config || {};
     SCALARS.forEach(function (key) { el(key).value = cfg[key] === undefined || cfg[key] === null ? '' : String(cfg[key]); });
 
+    // The stored key cannot be shown — the host redacts it to SECRET_SENTINEL before the config gets
+    // here — so the field is empty whether one is saved or not. Which state it is in has to be said by
+    // the control itself: an empty box under a placeholder reading "paste your API key" says "there
+    // isn't one", and a line of grey text below saying the opposite does not undo that.
     apiKeySaved = cfg.jellyseerrApiKey === SECRET_SENTINEL;
     if (apiKeySaved) el('jellyseerrApiKey').value = '';
-    el('apiKeyHint').textContent = apiKeySaved
-      ? 'A key is saved. Type a new one to replace it.'
-      : 'Seerr → Settings → General → API Key';
+    el('apiKeySavedPill').hidden = !apiKeySaved;
+    el('jellyseerrApiKey').placeholder = apiKeySaved
+      ? 'saved — type a new key to replace it…'
+      : 'paste your Seerr API key…';
     // Every switch defaults on except debug, matching the manifest's declared defaults.
     BOOLEANS.forEach(function (key) {
       var fallback = key !== 'debug';
