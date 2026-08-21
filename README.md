@@ -200,16 +200,16 @@ are listed because they are what the REST API and any backup will show you.
 | `users` | **yes** | `[]` | Recipient mappings, one per notified Seerr account: `{ seerrUserId, number, enabled }`. Identity and admin status come from `seerrRoster`, not from here; an account Seerr does not have cannot be added. Untick someone to stop notifying them. Nothing is delivered while none is enabled with a number. |
 | `jellyseerrUrl` | **yes** | `""` | Seerr base URL. See *Reaching a self-hosted Seerr*. |
 | `jellyseerrApiKey` | **yes** | `""` | Seerr API key (stored masked). Reads the user list, and fills notifications out. |
-| `requireMappedUser` | no | `true` | On: an event matching nobody is recorded as a delivery failure. Off: dropped quietly. |
-| `sendPoster` | no | `true` | Attach the poster to `MEDIA_AVAILABLE` / `MEDIA_PENDING`. |
-| `routing` | no | *(defaults)* | Per-event delivery rules — `{ EVENT: { user, admin, adminInfo } }`. Edited in **Who gets what**; unset events use the shipped defaults. |
+| `requireMappedUser` | no | `true` | On: an event whose requester or reporter matches no enabled recipient is written to the plugin's dead-letter buffer, and the health check reports the count and the most recent reason. Off: dropped without a trace. Shown in the panel as **Flag notifications with no recipient**. |
+| `sendPoster` | no | `true` | Attach the poster to `MEDIA_AVAILABLE` / `MEDIA_PENDING`. Sent as the image caption when the whole message fits WhatsApp's 1024-character caption limit, otherwise as an uncaptioned image followed by the text. |
+| `routing` | no | *(defaults)* | Per-event delivery rules — `{ EVENT: { user, admin, adminInfo } }`. Edited in **Who gets what**; unset events use the shipped defaults. `adminInfo` appends a block to the admin copy carrying the requester or reporter's name and email and the Seerr request/issue id. Someone who is both the requester and an admin gets one message — the admin one. |
 | `seerrRoster` | no | `[]` | Cached Seerr accounts (`{ id, name, email, isAdmin }`) so the editor can list them. Written by the Refresh button or `refresh-roster.mjs`. |
 | `rosterSyncedAt` | no | `""` | ISO timestamp of the last roster refresh. |
 | `rosterRefreshRequestedAt` | no | `""` | Token stamped by the Refresh button; changing it is what asks the plugin to refetch. Not edited by hand. |
 | `setup` | no | `{}` | Written by the plugin for the **Setup** tab: the ingress instances and their URLs, the last generated ingress secret, and the update check. Not edited by hand — but see the note below about the secret. |
 | `setupRequestedAt` | no | `""` | Token stamped by a Setup button as `<action>\|<arg>\|<timestamp>`, and cleared by the plugin once the action has run. Not edited by hand. |
-| `updateCheckEnabled` | no | `true` | Ask GitHub once a day whether a newer release exists. Off = no outbound request is ever made. |
-| `debug` | no | `false` | Log one line per delivery with masked chat ids. Never logs message bodies. |
+| `updateCheckEnabled` | no | `true` | Ask `api.github.com` for the latest release once a day, and show a banner when it is newer than the running build. Nothing is ever downloaded or installed. Off = no outbound request is made at all. The check also runs on demand from **Options → Check now**. |
+| `debug` | no | `false` | One gateway log line per delivery: event type, resolved recipient count, chat ids masked to their last four digits, and each send's outcome. Message bodies are never logged at any level. Shown in the panel as **Verbose logging**. |
 
 `setup.secret` holds the plaintext ingress secret from the last **Generate**. That is deliberate, and it
 is the only way the value can reach you: the gateway reveals an ingress secret exactly once, in the
@@ -220,7 +220,11 @@ regenerate icon if it leaks.
 
 Every **Now Available** section — overview, rating, runtime, genres, director/creator, top cast, trailer,
 seasons, collection — is always on. These were nine separate toggles until v1.2.0; that was more
-configuration surface than the decision deserved.
+configuration surface than the decision deserved, and the panel stopped mentioning them in v1.9.1 for
+the same reason: a list of things you cannot change is not a setting.
+
+The panel's own copy is deliberately short — a label, and at most one line where the label cannot carry
+it. This table is where the detail lives.
 
 ## Compatibility
 

@@ -6,6 +6,21 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.9.1] — 2026-08-21
+
+### Changed
+
+- **The panel says less.** Every switch carried two lines explaining how it worked internally — caption
+  byte limits, buffer names, what each log line contains. That is reference material, and it now lives in
+  the config table in the README, where someone looking for it can find it. On screen each control gets a
+  label and, only where the label cannot carry it, one short line:
+  - “Record events that reach nobody” → **Flag notifications with no recipient** · Shown by the health check.
+  - “Check GitHub once a day” → **Check for updates daily** · Shows a banner. Never installs anything.
+  - The Options tab’s opening paragraph, which listed nine things you cannot change, is gone.
+  - The Updates line is now facts separated by dots: `Version 1.9.1 · up to date · checked 7:26 PM`.
+- The **Admin info** explanation moved under the routing matrix, next to the column it explains, instead
+  of being restated in the tab’s opening paragraph.
+
 ## [1.9.0] — 2026-08-21
 
 ### Removed

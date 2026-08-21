@@ -313,7 +313,7 @@
 
 <section id="panel-connection" role="tabpanel" aria-labelledby="tab-connection" tabindex="0">
   <h2>Your Seerr server</h2>
-  <p class="lede">Required. Recipients are read from here, and notifications are filled out from here.</p>
+  <p class="lede">Recipients and media details both come from Seerr, so both fields are required.</p>
 
   <div class="card">
     <div class="field">
@@ -325,15 +325,15 @@
       <label for="jellyseerrApiKey">API key</label>
       <input type="password" id="jellyseerrApiKey" name="jellyseerrApiKey" class="mono"
              autocomplete="off" spellcheck="false" translate="no" />
-      <small>Seerr → Settings → General → API Key. Stored masked; leave the masked value alone to keep the saved key.</small>
+      <small>Seerr → Settings → General → API Key</small>
     </div>
-    <p class="hint">The health-check button on the plugin row tests these: it reports the Seerr version and whether the key was accepted.</p>
+    <p class="hint">Test them with the health check on the plugin row.</p>
   </div>
 </section>
 
 <section id="panel-recipients" role="tabpanel" aria-labelledby="tab-recipients" tabindex="0" hidden>
   <h2>Who can be notified</h2>
-  <p class="lede">Everyone on your Seerr server. Tick a person and give them a WhatsApp number to start notifying them. Names and admin status come from Seerr.</p>
+  <p class="lede">Tick a person and add their WhatsApp number.</p>
 
   <div class="card">
     <div class="card-head">
@@ -352,7 +352,7 @@
       </div>
     </div>
 
-    <p class="hint" id="rosterEmpty" hidden>No Seerr accounts cached yet — press Refresh from Seerr.</p>
+    <p class="hint" id="rosterEmpty" hidden>Press Refresh from Seerr to load your users.</p>
     <table class="people" id="userTable">
       <thead>
         <tr>
@@ -369,7 +369,7 @@
 
 <section id="panel-routing" role="tabpanel" aria-labelledby="tab-routing" tabindex="0" hidden>
   <h2>Who gets what</h2>
-  <p class="lede">Click a cell to flip it. <b>Requester</b> is the person behind the event; <b>admins</b> is every notified recipient Seerr marks as an admin. Someone who is both gets one message — the admin one.</p>
+  <p class="lede">Click a cell to change it.</p>
 
   <div class="card">
     <div class="card-head">
@@ -387,33 +387,33 @@
       </thead>
       <tbody id="routingBody"></tbody>
     </table>
+    <p class="hint" style="margin-top:10px">Admin info adds who asked for it, and the request id.</p>
   </div>
 </section>
 
 <section id="panel-options" role="tabpanel" aria-labelledby="tab-options" tabindex="0" hidden>
   <h2>Options</h2>
-  <p class="lede">Every Now Available section — overview, rating, runtime, genres, director, cast, trailer, seasons, collection — is always on.</p>
 
   <div class="card">
     <label class="switch" for="sendPoster">
       <input type="checkbox" id="sendPoster" name="sendPoster" />
       <span class="txt">
         <b>Send the poster</b>
-        <small>Attached to Now Available and Request Submitted, as the caption when the message fits WhatsApp’s 1024-character limit.</small>
+        <small>Artwork with each notification.</small>
       </span>
     </label>
     <label class="switch" for="requireMappedUser">
       <input type="checkbox" id="requireMappedUser" name="requireMappedUser" />
       <span class="txt">
-        <b>Record events that reach nobody</b>
-        <small>On: an event matching no recipient is kept in the failure buffer, and the plugin’s health check reports it. Off: dropped quietly.</small>
+        <b>Flag notifications with no recipient</b>
+        <small>Shown by the health check.</small>
       </span>
     </label>
     <label class="switch" for="debug">
       <input type="checkbox" id="debug" name="debug" />
       <span class="txt">
         <b>Verbose logging</b>
-        <small>One line per delivery: event type, recipient count, masked chat ids, send outcomes. Never logs message bodies.</small>
+        <small>Extra detail in the gateway log. Never message contents.</small>
       </span>
     </label>
   </div>
@@ -423,13 +423,13 @@
   <div class="card">
     <div class="card-head">
       <h3>Updates</h3>
-      <button type="button" class="btn" id="checkUpdate">Check for updates</button>
+      <button type="button" class="btn" id="checkUpdate">Check now</button>
     </div>
     <label class="switch" for="updateCheckEnabled">
       <input type="checkbox" id="updateCheckEnabled" name="updateCheckEnabled" />
       <span class="txt">
-        <b>Check GitHub once a day</b>
-        <small>Shows a banner when a newer release exists. Nothing is downloaded or installed. Off: no outbound request is ever made.</small>
+        <b>Check for updates daily</b>
+        <small>Shows a banner. Never installs anything.</small>
       </span>
     </label>
     <p class="hint" id="updateMeta" style="margin-top:9px"></p>
@@ -474,13 +474,11 @@
     <label class="sr-only" for="secretInstance">Instance to generate a secret for</label>
     <select id="secretInstance" hidden></select>
     <p class="hint" id="secretWarning" hidden>
-      Generating replaces the current secret, and Seerr gets <code>401</code> until you paste the new one in.
-      Press the button again to confirm.
+      Replaces the current secret — Seerr stops working until you paste the new one in. Press again to confirm.
     </p>
 
     <p class="hint" style="margin-top:10px">
-      Leave the <b>JSON Payload</b> at Seerr’s default, tick the notification types you want, and Save.
-      Who gets what decides who receives each one.
+      Leave the <b>JSON Payload</b> at Seerr’s default, and tick the notification types you want.
     </p>
   </div>
 
@@ -575,7 +573,7 @@
     if (!text) return;
 
     var done = function (ok) {
-      setStatus(ok ? 'Copied.' : 'Press Ctrl+C to copy the selected value.', ok);
+      setStatus(ok ? 'Copied.' : 'Press Ctrl+C to copy.', ok);
       if (!button) return;
       var was = button.getAttribute('data-icon') || 'i-copy';
       setIcon(button, 'i-check');
@@ -620,7 +618,7 @@
     try { opened = window.open(url, '_blank', 'noopener'); } catch (err) { opened = null; }
     if (opened) return;
     copyText(url, null);
-    setStatus('This panel cannot open tabs — the link is on your clipboard.', true);
+    setStatus('Link copied — this panel can’t open tabs.', true);
   }
 
   // ── Tabs ────────────────────────────────────────────────────────────────
@@ -725,7 +723,7 @@
       };
     });
     renderRouting();
-    setStatus('Routing reset to defaults. Save to keep it.', true);
+    setStatus('Reset to defaults. Save to keep it.', true);
   }
 
   // ── Recipients ──────────────────────────────────────────────────────────
@@ -834,8 +832,8 @@
       var note = document.createElement('div');
       note.className = 'note';
       note.innerHTML =
-        '<b>No ingress instance exists yet</b> — Seerr has nowhere to post until one does. Run this on the ' +
-        'OpenWA host with an admin API key, then press Check again. The response also carries the secret.';
+        '<b>No ingress instance yet</b> — Seerr has nowhere to post. Run this on the OpenWA host, then ' +
+        'press Check again. It returns a secret too, so you can skip the next step.';
       list.appendChild(note);
 
       var command = "curl -sX POST http://<openwa-host>:<openwa-port>/api/integration/plugins/seerr-notify/instances " +
@@ -935,14 +933,14 @@
     var update = setup.update || null;
     var running = setup.version || (update && update.current) || '';
     var checked = update ? at(update.checkedAt) : '';
-    var line = running ? 'Running version ' + running + '.' : 'Version unknown until the plugin has run once.';
+    var parts = [running ? 'Version ' + running : 'Version unknown'];
 
-    if (update && update.available) line += ' Version ' + update.latest + ' is available.';
-    else if (checked) line += ' Checked at ' + checked + ' — ' + (update.note || 'up to date') + '.';
-    else if (update) line += ' ' + (update.note || 'Not checked yet.');
-    else line += ' Never checked for updates.';
-    if (!el('updateCheckEnabled').checked) line += ' Daily checks are off.';
-    el('updateMeta').textContent = line;
+    if (update && update.available) parts.push(update.latest + ' available');
+    else if (update && update.note) parts.push(update.note);
+    else parts.push('never checked');
+    if (checked) parts.push('checked ' + checked);
+    if (!el('updateCheckEnabled').checked) parts.push('daily checks off');
+    el('updateMeta').textContent = parts.join(' · ');
 
     var banner = el('updateBanner');
     banner.hidden = !(update && update.available);
@@ -987,7 +985,7 @@
   function waitForSetupResult() {
     if (!pending) return;
     if (pending.tries >= SETUP_POLL_MS.length) {
-      setStatus(pending.label + ' Still running — reload the dashboard to see the result.', true);
+      setStatus('Still running — reload the dashboard to see the result.', true);
       finishSetup();
       return;
     }
@@ -1006,11 +1004,11 @@
   /** What to say once the plugin's answer lands — the next step, not "OK". */
   function setupDone(action) {
     if (action === 'roster') return 'Recipient list updated.';
-    if (action === 'secret') return 'New secret ready. Copy it into Seerr.';
-    if (action === 'instances') return 'Instance list re-read from OpenWA.';
+    if (action === 'secret') return 'New secret ready — copy it into Seerr.';
+    if (action === 'instances') return 'Instance list updated.';
     var update = setup.update || {};
     if (update.available) return 'Version ' + update.latest + ' is available — see the banner.';
-    return update.note ? 'Update check: ' + update.note + '.' : 'Update check finished.';
+    return update.note ? update.note.charAt(0).toUpperCase() + update.note.slice(1) + '.' : 'Checked.';
   }
 
   function finishSetup() {
@@ -1150,7 +1148,7 @@
       if (pending) finishSetup();
       refreshBtn.disabled = false;
       saveBtn.disabled = false;
-      setStatus(data.message || 'Save failed — nothing was written.', false);
+      setStatus(data.message || 'Save failed — nothing was changed.', false);
     }
   });
 
@@ -1163,7 +1161,7 @@
     // Saved either way — a first-run operator has to save a Seerr URL before a roster refresh can find
     // anyone to map, so this warns about what will not be delivered yet rather than refusing.
     if (live.length === 0) {
-      setStatus('Saved. Nothing can be delivered yet — tick a recipient and give them a WhatsApp number.', false);
+      setStatus('Saved. Tick a recipient and add their number to start delivering.', false);
     }
   });
 
