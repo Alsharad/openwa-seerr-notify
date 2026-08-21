@@ -259,6 +259,40 @@ Each run carries a `_nonce`, so it is always a fresh delivery and never deduplic
 Seerr username or email the event comes from; it must match a mapped, enabled recipient, since every
 event except `TEST_NOTIFICATION` is routed to its requester or reporter by default.
 
+### When a notification can be silently dropped
+
+OpenWA de-duplicates ingress on `(pluginId, instanceId, providerDeliveryId)`. With no delivery-id header
+from the provider, that id is `sha256(pluginId ∥ instanceId ∥ route ∥ rawBody)` — so **two notifications
+with byte-identical bodies collide, and the second is answered `200 duplicate` before this plugin runs.**
+It stays dropped until the row ages out via `INGRESS_DEDUP_RETENTION_DAYS` (default 7).
+
+Most events are safe, because the default payload carries something that changes:
+
+| Event | Distinguishing field | Safe? |
+|---|---|---|
+| `MEDIA_*` | `request_id` (Seerr's per-request id) and `requestedBy_*` | yes |
+| `ISSUE_CREATED` | `issue_id` | yes |
+| `ISSUE_COMMENT` | — | **no** |
+| `ISSUE_RESOLVED` / `ISSUE_REOPENED` | `issue_id` + `issue_status` only | **no** |
+| `TEST_NOTIFICATION` | — | **no** (see [Testing it](#testing-it)) |
+
+A declined request followed by the same title being requested again — by the same person or a different
+one — is **not** a collision: Seerr issues a new `request_id` and never reuses one.
+
+What does collide:
+
+- The same person posting the **same comment text** twice on the same issue ("any update?").
+- An issue **resolved, reopened, then resolved again** — the second `ISSUE_RESOLVED` is byte-identical
+  to the first.
+
+Neither is fixable here or in Seerr's settings. Seerr's template variable map has no `comment_id`, no
+notification id and no timestamp, so there is no varying value to put in the payload or in a custom
+header for `dedupHeader` to key on. The fix belongs in the host: a per-route opt-out on
+`deriveDeliveryId`, or a coarse timestamp folded into it.
+
+Note that the key includes `instanceId`, so renaming or recreating an ingress instance starts a fresh
+de-duplication window.
+
 ### Build from source
 
 ```bash

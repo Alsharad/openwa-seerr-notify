@@ -6,6 +6,15 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+### Documentation
+
+- New README section, **When a notification can be silently dropped**, mapping exactly which events can
+  collide under OpenWA's ingress de-duplication and which cannot. Short version: every `MEDIA_*` event
+  carries a `request_id` that Seerr never reuses, so a declined-then-re-requested title always notifies;
+  repeated identical issue comments and resolve/reopen/resolve cycles do not, and cannot be made to,
+  because Seerr's variable map exposes no comment id, notification id or timestamp.
+
+
 ## [1.20.0] - 2026-08-21
 
 ### Added
