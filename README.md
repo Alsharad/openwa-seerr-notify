@@ -74,9 +74,9 @@ letters are owned by the plugin instead.
 
 ## Setup
 
-Most of this is done for you by the **Setup** tab, which is the first thing the config screen opens on.
-It shows the webhook URL read back from the gateway, generates the header secret, and spells out what to
-set in Seerr. The full path:
+Most of this is done for you by the **Setup** tab (the last tab on the config screen). It shows the
+webhook URL read back from the gateway, generates the header secret, and spells out what to set in Seerr.
+The full path:
 
 1. **Have a WhatsApp session running** in OpenWA, and note its session id.
 2. **Create a Seerr API key** (Jellyseerr/Overseerr → Settings → General → API Key) if you want
@@ -99,8 +99,8 @@ set in Seerr. The full path:
    button on the plugin row to confirm — it reports the Seerr version and whether the key was accepted,
    and it works before any recipient exists.
 6. **Configure → Setup** now shows the webhook URL to paste into Seerr. If you did not keep the secret
-   from step 4, press **Generate a new secret** (twice — it asks), reload the dashboard, and copy the
-   value it shows. Clear it once Seerr has it.
+   from step 4, press **Generate a new secret** (twice — it asks) and copy the value that appears a
+   second later. Clear it once Seerr has it.
 7. **Point Seerr at it** — Jellyseerr/Overseerr → Settings → Notifications → Webhook:
    - **Enable Agent**: on
    - **Webhook URL**: the URL from the Setup tab
@@ -139,8 +139,8 @@ curl -X POST http://<openwa-host>:2785/api/plugins/seerr-notify/enable \
   -H "X-API-Key: <ADMIN_KEY>"
 ```
 
-Then open **Configure** and work through the tabs — Setup, Connection, Recipients, Who gets what,
-Options. The plugin enables with an empty config; the health check and the log tell you what is still
+Then open **Configure** and work through the tabs — Connection, Recipients, Who gets what, Options, and
+Setup for the Seerr side. The plugin enables with an empty config; the health check and the log tell you what is still
 missing.
 
 ### Updates

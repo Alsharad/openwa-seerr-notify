@@ -176,91 +176,14 @@
 </div>
 
 <div class="tabs" role="tablist">
-  <button role="tab" id="tab-setup" aria-controls="panel-setup" aria-selected="true">Setup</button>
-  <button role="tab" id="tab-connection" aria-controls="panel-connection" aria-selected="false">Connection</button>
+  <button role="tab" id="tab-connection" aria-controls="panel-connection" aria-selected="true">Connection</button>
   <button role="tab" id="tab-recipients" aria-controls="panel-recipients" aria-selected="false">Recipients</button>
   <button role="tab" id="tab-routing" aria-controls="panel-routing" aria-selected="false">Who gets what</button>
   <button role="tab" id="tab-options" aria-controls="panel-options" aria-selected="false">Options</button>
+  <button role="tab" id="tab-setup" aria-controls="panel-setup" aria-selected="false">Setup</button>
 </div>
 
-<section id="panel-setup" role="tabpanel" aria-labelledby="tab-setup">
-  <h2>Point Seerr at this plugin</h2>
-  <p class="hint">
-    In Seerr: <strong>Settings → Notifications → Webhook</strong>. Tick <strong>Enable Agent</strong>, then fill in the
-    two fields below, leave everything else alone, and Save.
-  </p>
-
-  <ol class="steps">
-    <li>
-      <h3>1 · Webhook URL</h3>
-      <p>One per ingress instance. Paste the whole line into Seerr's <strong>Webhook URL</strong> field.</p>
-      <div id="instanceList"></div>
-      <div class="setup-bar">
-        <span id="instanceMeta"></span>
-        <button type="button" class="mini" id="refreshInstances">Refresh</button>
-      </div>
-    </li>
-
-    <li>
-      <h3>2 · Custom header</h3>
-      <p>
-        The route is authenticated by a shared secret in a header — that is what stops anyone on your network from
-        posting fake notifications to it. Add ONE custom header in Seerr:
-      </p>
-      <div class="copyline">
-        <span class="tag">Name</span>
-        <code>X-Seerr-Token</code>
-        <button type="button" class="mini" data-copy-text="X-Seerr-Token">Copy</button>
-      </div>
-      <div class="copyline">
-        <span class="tag">Value</span>
-        <input type="text" id="ingressSecret" readonly placeholder="generate one below, or use the secret shown when you created the instance" />
-        <button type="button" class="mini" id="copySecret">Copy</button>
-        <button type="button" class="mini" id="clearSecret">Clear</button>
-      </div>
-      <div class="setup-bar">
-        <select id="secretInstance" hidden></select>
-        <button type="button" class="mini" id="generateSecret">Generate a new secret</button>
-        <span id="secretMeta"></span>
-      </div>
-      <p class="warn" id="secretWarning" hidden>
-        This replaces the instance's current secret. Seerr will get <code>401 Unauthorized</code> on every
-        notification until you paste the new value into it. Click again to confirm.
-      </p>
-      <p style="margin-top:8px">
-        Leave <strong>Authorization Header</strong> empty — Seerr sends that one as a bare value with no scheme, which
-        this route does not read. Clear the secret from here once Seerr has it.
-      </p>
-    </li>
-
-    <li>
-      <h3>3 · JSON payload</h3>
-      <div class="note">
-        <strong>Leave the JSON payload at Seerr's default.</strong> Every field this plugin reads comes from that
-        template — <code>notification_type</code>, <code>subject</code>, <code>message</code>, <code>image</code>,
-        <code>media</code>, <code>request</code>, <code>issue</code>, <code>comment</code>. If you have edited it,
-        press <strong>Reset to Default</strong> in Seerr. Extra fields are ignored, so a template that only ADDS
-        things is fine.
-      </div>
-    </li>
-
-    <li>
-      <h3>4 · Notification types</h3>
-      <p>
-        Tick every type you want in Seerr — it decides what gets sent at all, and the
-        <strong>Who gets what</strong> tab decides who receives each one. A type unticked in Seerr never arrives here.
-      </p>
-      <p>
-        Then press <strong>Test</strong>. Note that Seerr's test payload is byte-identical every time, so a second
-        press inside the de-duplication window is answered <code>200 duplicate</code> and delivers nothing — that is
-        the gateway protecting you from replayed webhooks, not a fault. Use <code>send-test.mjs</code> from the
-        repository to test repeatedly, or with any event type.
-      </p>
-    </li>
-  </ol>
-</section>
-
-<section id="panel-connection" role="tabpanel" aria-labelledby="tab-connection" hidden>
+<section id="panel-connection" role="tabpanel" aria-labelledby="tab-connection">
   <h2>Seerr connection</h2>
   <p class="hint">Used to enrich notifications with overview, ratings, cast and season status. Leave blank to format from the webhook payload alone. Use the health-check button on the plugin row to test these settings.</p>
   <div class="field">
@@ -358,6 +281,83 @@
   </div>
 </section>
 
+<section id="panel-setup" role="tabpanel" aria-labelledby="tab-setup" hidden>
+  <h2>Point Seerr at this plugin</h2>
+  <p class="hint">
+    In Seerr: <strong>Settings → Notifications → Webhook</strong>. Tick <strong>Enable Agent</strong>, then fill in the
+    two fields below, leave everything else alone, and Save.
+  </p>
+
+  <ol class="steps">
+    <li>
+      <h3>1 · Webhook URL</h3>
+      <p>One per ingress instance. Paste the whole line into Seerr's <strong>Webhook URL</strong> field.</p>
+      <div id="instanceList"></div>
+      <div class="setup-bar">
+        <span id="instanceMeta"></span>
+        <button type="button" class="mini" id="refreshInstances">Refresh</button>
+      </div>
+    </li>
+
+    <li>
+      <h3>2 · Custom header</h3>
+      <p>
+        The route is authenticated by a shared secret in a header — that is what stops anyone on your network from
+        posting fake notifications to it. Add ONE custom header in Seerr:
+      </p>
+      <div class="copyline">
+        <span class="tag">Name</span>
+        <code>X-Seerr-Token</code>
+        <button type="button" class="mini" data-copy-text="X-Seerr-Token">Copy</button>
+      </div>
+      <div class="copyline">
+        <span class="tag">Value</span>
+        <input type="text" id="ingressSecret" readonly placeholder="generate one below, or use the secret shown when you created the instance" />
+        <button type="button" class="mini" id="copySecret">Copy</button>
+        <button type="button" class="mini" id="clearSecret">Clear</button>
+      </div>
+      <div class="setup-bar">
+        <select id="secretInstance" hidden></select>
+        <button type="button" class="mini" id="generateSecret">Generate a new secret</button>
+        <span id="secretMeta"></span>
+      </div>
+      <p class="warn" id="secretWarning" hidden>
+        This replaces the instance's current secret. Seerr will get <code>401 Unauthorized</code> on every
+        notification until you paste the new value into it. Click again to confirm.
+      </p>
+      <p style="margin-top:8px">
+        Leave <strong>Authorization Header</strong> empty — Seerr sends that one as a bare value with no scheme, which
+        this route does not read. Clear the secret from here once Seerr has it.
+      </p>
+    </li>
+
+    <li>
+      <h3>3 · JSON payload</h3>
+      <div class="note">
+        <strong>Leave the JSON payload at Seerr's default.</strong> Every field this plugin reads comes from that
+        template — <code>notification_type</code>, <code>subject</code>, <code>message</code>, <code>image</code>,
+        <code>media</code>, <code>request</code>, <code>issue</code>, <code>comment</code>. If you have edited it,
+        press <strong>Reset to Default</strong> in Seerr. Extra fields are ignored, so a template that only ADDS
+        things is fine.
+      </div>
+    </li>
+
+    <li>
+      <h3>4 · Notification types</h3>
+      <p>
+        Tick every type you want in Seerr — it decides what gets sent at all, and the
+        <strong>Who gets what</strong> tab decides who receives each one. A type unticked in Seerr never arrives here.
+      </p>
+      <p>
+        Then press <strong>Test</strong>. Note that Seerr's test payload is byte-identical every time, so a second
+        press inside the de-duplication window is answered <code>200 duplicate</code> and delivers nothing — that is
+        the gateway protecting you from replayed webhooks, not a fault. Use <code>send-test.mjs</code> from the
+        repository to test repeatedly, or with any event type.
+      </p>
+    </li>
+  </ol>
+</section>
+
 <div class="bar">
   <button type="button" class="action" id="save">Save configuration</button>
   <span id="feedback"></span>
@@ -385,8 +385,16 @@
   var setup = {};
   /** Stamped by a Setup button, cleared by the plugin once the action has run. */
   var setupToken = '';
-  /** Which button is waiting on a plugin round trip, so config:saved can say what happens next. */
-  var pending = '';
+  /**
+   * A Setup action in flight. The plugin writes its result to config a second or two AFTER the save that
+   * asked for it, and the host answers config:get from the plugin list the dashboard already holds — so
+   * the new value is invisible until something makes the dashboard re-read it. Only a save does that
+   * (Plugins.tsx invalidates the plugins query on a successful config:save), so this re-saves and
+   * re-reads on a short schedule until the plugin's write shows up. See waitForSetupResult.
+   */
+  var pending = null;
+  /** How long to wait before each re-read. The last is generous: the GitHub check has an 8 s budget. */
+  var SETUP_POLL_MS = [2500, 5000, 9000];
 
   // ── Clipboard ───────────────────────────────────────────────────────────
   // The frame is sandboxed with an opaque origin and (over plain http) is not a secure context, so
@@ -468,7 +476,7 @@
       list.appendChild(none);
       list.appendChild(copyLine(
         'curl',
-        "curl -sX POST http://localhost:2785/api/integration/plugins/seerr-notify/instances " +
+        "curl -sX POST http://<openwa-host>:<openwa-port>/api/integration/plugins/seerr-notify/instances " +
         "-H 'X-API-Key: <admin key>' -H 'Content-Type: application/json' " +
         '-d \'{"instanceId":"seerr-prod"}\''
       ));
@@ -481,7 +489,7 @@
       var url = instance.url || '';
       // buildIngressUrls returns a bare path when the gateway has no BASE_URL — the host is the
       // operator's to supply, and guessing it here would hand Seerr a URL that silently never connects.
-      var shown = instance.relative ? 'http://<your-openwa-host>:2785' + url : url;
+      var shown = instance.relative ? 'http://<openwa-host>:<openwa-port>' + url : url;
       var line = copyLine(instance.instanceId, shown);
       if (instance.enabled === false) {
         var off = document.createElement('span');
@@ -534,8 +542,9 @@
         (update.available ? ' — v' + update.latest + ' available.' : (update.note ? ' — ' + update.note + '.' : '.'));
 
     el('instanceMeta').textContent = setup.instancesAt
-      ? 'Read from the gateway at ' + new Date(setup.instancesAt).toLocaleString()
-      : 'Not read yet.';
+      ? 'This list came from OpenWA at ' + new Date(setup.instancesAt).toLocaleTimeString() +
+        '. Re-read it if you have just created an instance:'
+      : 'Not read from OpenWA yet:';
 
     if (setup.error) showFeedback(setup.error, false);
 
@@ -548,15 +557,56 @@
     }
   }
 
-  // Same mechanism as "Refresh from Seerr": the editor cannot fetch, so it saves a token the plugin
-  // acts on. The plugin's write-back is not visible until the dashboard reloads, which is what the
-  // message says — the values are durable in config, so they are there after the reload.
+  // Same mechanism as "Refresh from Seerr": the editor cannot fetch, so it saves a token the plugin acts
+  // on. Unlike that button, this then waits for the answer and renders it in place.
   function requestSetup(action, arg, label) {
     setupToken = action + '|' + (arg || '') + '|' + new Date().toISOString();
-    pending = label;
+    pending = { token: setupToken, action: action, label: label, tries: 0, phase: 'action' };
     saveBtn.disabled = true;
-    showFeedback('', true);
+    refreshBtn.disabled = true;
+    showFeedback(label, true);
     parent.postMessage({ type: 'config:save', config: assembleConfig() }, '*');
+  }
+
+  /**
+   * Ask the dashboard to re-read config, so the plugin's write-back becomes visible here.
+   *
+   * The save is what forces the re-read; `setup` and `setupRequestedAt` are stripped from it precisely
+   * because config writes merge shallowly host-side, so omitting them leaves the plugin's fresh values
+   * untouched. Sending our stale copy back would overwrite the very thing we are waiting for.
+   */
+  function waitForSetupResult() {
+    if (!pending) return;
+    if (pending.tries >= SETUP_POLL_MS.length) {
+      showFeedback(pending.label + ' Still running — reload the dashboard to see the result.', true);
+      finishSetup();
+      return;
+    }
+    var wait = SETUP_POLL_MS[pending.tries];
+    pending.tries += 1;
+    setTimeout(function () {
+      if (!pending) return;
+      pending.phase = 'reread';
+      var cfg = assembleConfig();
+      delete cfg.setup;
+      delete cfg.setupRequestedAt;
+      parent.postMessage({ type: 'config:save', config: cfg }, '*');
+    }, wait);
+  }
+
+  /** What to say once the plugin's answer has landed — the useful next step, not "OK". */
+  function setupDone(action) {
+    if (action === 'secret') return 'New secret generated below. Copy it into Seerr, then press Clear.';
+    if (action === 'instances') return 'Instance list re-read from OpenWA.';
+    var update = setup.update || {};
+    if (update.available) return 'Version ' + update.latest + ' is available — the link is at the top.';
+    return update.note ? 'Update check: ' + update.note + '.' : 'Update check finished.';
+  }
+
+  function finishSetup() {
+    pending = null;
+    saveBtn.disabled = false;
+    refreshBtn.disabled = false;
   }
 
   // ── Tabs ────────────────────────────────────────────────────────────────
@@ -875,19 +925,38 @@
     if (data.type === 'config:value') {
       applyTheme(data.theme);
       populateConfig(data.config);
-    } else if (data.type === 'config:saved') {
       if (pending) {
-        showFeedback(pending + ' Reload the dashboard in a few seconds to see the result.', true);
-        pending = '';
+        // `lastAction` echoes the token that produced this state, so it is the one unambiguous signal
+        // that what we are looking at is the answer to THIS click and not the state before it.
+        var landed = setup && setup.lastAction === pending.token;
+        if (landed && setup.error) {
+          showFeedback(setup.error, false);
+          finishSetup();
+        } else if (landed) {
+          showFeedback(setupDone(pending.action), true);
+          finishSetup();
+        } else {
+          waitForSetupResult();
+        }
+      }
+    } else if (data.type === 'config:saved') {
+      if (pending && pending.phase === 'action') {
+        waitForSetupResult();
+      } else if (pending && pending.phase === 'reread') {
+        // The dashboard invalidates its plugins query on a successful save but does not await the
+        // refetch, so give it a moment before asking for the value.
+        setTimeout(function () { parent.postMessage({ type: 'config:get' }, '*'); }, 700);
       } else if (refreshBtn.disabled) {
         showFeedback('Fetching from Seerr… reload this page in a few seconds to see the list.', true);
+        refreshBtn.disabled = false;
+        saveBtn.disabled = false;
       } else {
         showFeedback('Saved.', true);
+        refreshBtn.disabled = false;
+        saveBtn.disabled = false;
       }
-      refreshBtn.disabled = false;
-      saveBtn.disabled = false;
     } else if (data.type === 'config:error') {
-      pending = '';
+      if (pending) finishSetup();
       refreshBtn.disabled = false;
       showFeedback(data.message || 'Save failed.', false);
       saveBtn.disabled = false;
@@ -932,7 +1001,7 @@
   });
 
   el('refreshInstances').addEventListener('click', function () {
-    requestSetup('instances', '', 'Reading the ingress instances…');
+    requestSetup('instances', '', 'Re-reading the instance list from OpenWA…');
   });
 
   el('checkUpdate').addEventListener('click', function () {
@@ -973,7 +1042,7 @@
     button.classList.remove('armed');
     button.textContent = 'Generate a new secret';
     el('secretWarning').hidden = true;
-    requestSetup('secret', target, 'Rotating the ingress secret…');
+    requestSetup('secret', target, 'Generating a new secret…');
   });
 
   parent.postMessage({ type: 'config:get' }, '*');

@@ -10,13 +10,19 @@ All notable changes to this plugin are documented here. The format follows
 
 ### Added
 
-- **A Setup tab**, which is now the first thing the editor opens on. It shows the exact webhook URL to
-  paste into Seerr — read back from the gateway's own instance list rather than assembled by hand — the
-  header name, and the walkthrough of what to set in Seerr and what to leave alone.
+- **A Setup tab** — the last tab, since it is a first-run aid and the tabs an operator returns to are
+  Connection and Recipients. It shows the exact webhook URL to paste into Seerr, read back from the
+  gateway's own instance list rather than assembled by hand, the header name, and the walkthrough of what
+  to set in Seerr and what to leave alone.
 - **Generate a new secret.** The gateway reveals an ingress secret exactly once, in the response to the
   call that mints it, so the editor cannot read the existing one back. This rotates the instance secret
   and shows the plaintext with a Copy button, behind a two-click confirm because rotating breaks the
   running webhook until the new value reaches Seerr. Clear it once Seerr has it.
+- A Setup action now shows its result in place. The plugin writes its answer to config a moment after the
+  save that asked for it, and the dashboard answers the editor from the plugin list it already holds — so
+  the editor re-saves (stripped of the keys the plugin owns, which shallow-merge leaves alone) to make the
+  dashboard re-read, then re-reads. Measured on a live gateway: all three actions land in under 0.3 s, so
+  one re-read is enough and generating a secret no longer means reloading the page.
 - **An update banner.** Once a day the plugin asks GitHub whether a newer release exists, and the editor
   shows a banner with the release URL if so. Nothing is downloaded or installed. `updateCheckEnabled`
   switches the check off entirely, and "Check now" runs it on demand.

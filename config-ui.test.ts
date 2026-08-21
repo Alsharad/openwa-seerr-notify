@@ -204,3 +204,25 @@ test('the manifest can reach an operator-hosted Seerr, not only an https one', (
   assert.deepEqual(manifest.net?.allow, ['*']);
   assert.deepEqual(manifest.net?.allowConfigHosts, ['jellyseerrUrl']);
 });
+
+test('the re-read save cannot clobber what it is waiting for', () => {
+  // After a Setup action the editor re-saves purely to make the dashboard re-read config — that is the
+  // only lever it has, since the host answers config:get from the plugin list the page already holds.
+  // Config writes merge shallowly host-side, so stripping these two keys is what leaves the plugin's
+  // fresh write intact. Send the editor's stale copy back instead and the answer is overwritten by the
+  // question, and the value never appears at all.
+  const body = /function waitForSetupResult\(\) \{([\s\S]*?)\n  \}/.exec(html);
+  assert.ok(body, 'could not find waitForSetupResult in the editor');
+  assert.match(body[1], /delete cfg\.setup;/, 'the re-read save would overwrite the plugin write-back');
+  assert.match(body[1], /delete cfg\.setupRequestedAt;/, 'the re-read save would replay a spent token');
+});
+
+test('the Setup tab is the last tab, and not the one the editor opens on', () => {
+  // It is a first-run aid; the tabs an operator returns to are Connection and Recipients.
+  const tabs = [...html.matchAll(/<button role="tab" id="tab-([a-z]+)"[^>]*aria-selected="(true|false)"/g)];
+  assert.deepEqual(
+    tabs.map((t) => t[1]),
+    ['connection', 'recipients', 'routing', 'options', 'setup'],
+  );
+  assert.deepEqual(tabs.filter((t) => t[2] === 'true').map((t) => t[1]), ['connection']);
+});
