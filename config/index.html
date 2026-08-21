@@ -1017,7 +1017,11 @@
     setButtonLabel(el('installUpdateOptions'), 'i-download', 'Install update');
 
     // The same facts as the banner, in one line — so the two can never disagree.
-    var parts = [running ? 'Version ' + running : 'Version unknown'];
+    // Every button here works by saving a token for the plugin to act on, and the host only forwards
+    // config changes to a plugin whose status is ENABLED. Installed-but-not-enabled therefore looks
+    // exactly like a hang, so say which it is: an empty setup.version means no background pass has ever
+    // finished, which on a running plugin is true for a few seconds at most.
+    var parts = [running ? 'Version ' + running : 'Not running yet — enable the plugin on its card'];
     if (offer) parts.push(update.latest + ' available');
     else if (installed) parts.push('installed ' + installedVersion + ', reload to load it');
     else if (installing) parts.push('installing ' + (setup.upgradingTo || (pending && pending.target) || ''));
@@ -1064,9 +1068,18 @@
     if (!pending) return;
     var schedule = pollSchedule();
     if (pending.tries >= schedule.length) {
-      setStatus(pending.action === 'upgrade'
-        ? 'The install did not report back. Reload the dashboard to see which version is running.'
-        : 'Still running — reload the dashboard to see the result.', true);
+      // Never having run at all is the likeliest reason nothing answered, and it is the one the operator
+      // can act on. Saying "still running" to someone whose plugin is not enabled sends them to reload a
+      // page that will say the same thing for ever.
+      var neverRan = !setup.version;
+      setStatus(
+        neverRan
+          ? 'No answer — is the plugin enabled? Enable it on the plugin card, then try again.'
+          : pending.action === 'upgrade'
+            ? 'The install did not report back. Reload the dashboard to see which version is running.'
+            : 'Still running — reload the dashboard to see the result.',
+        !neverRan,
+      );
       finishSetup();
       return;
     }

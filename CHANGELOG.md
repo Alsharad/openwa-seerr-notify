@@ -22,6 +22,20 @@ All notable changes to this plugin are documented here. The format follows
 - Removed the instruction to reload the page after Refresh from Seerr; the list has repainted in place
   since 1.9.0. Host placeholders read `<openwa-host>:<openwa-port>` everywhere, matching the panel.
 
+## [1.14.1] — 2026-08-21
+
+### Fixed
+
+- **An installed-but-not-enabled plugin looked like a broken one.** Every button in the panel works by
+  saving a token for the plugin to act on, and the host only forwards config changes to a plugin whose
+  status is ENABLED — so before you press Enable, Check now writes a token nobody is listening for, the
+  Updates line reads “Version unknown · never checked”, and the eventual timeout says “Still running —
+  reload the dashboard”, which is wrong in the least helpful way.
+
+  The panel has no plugin-status signal, but `setup.version` is a good proxy: the background pass writes
+  it on enable, so an empty one means the plugin has never run. Updates now reads **“Not running yet —
+  enable the plugin on its card”**, and a timed-out action says **“No answer — is the plugin enabled?”**
+
 ## [1.14.0] — 2026-08-21
 
 ### Changed

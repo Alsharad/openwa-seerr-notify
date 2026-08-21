@@ -411,3 +411,15 @@ test('the instance picker chooses the URL, not just the secret', () => {
   );
   assert.match(script, /el\('secretInstance'\)\.addEventListener\('change'/, 'picking must repaint');
 });
+
+test('a plugin that is not enabled is named as the cause, not reported as a hang', () => {
+  // Every button in this panel saves a token for the plugin to act on, and the host only forwards config
+  // changes to a plugin whose status is ENABLED (plugin-lifecycle.ts). So installed-but-not-enabled looks
+  // identical to a hang — and "still running, reload the dashboard" sends that operator to reload a page
+  // that will say the same thing for ever. `setup.version` is the proxy: the background pass writes it on
+  // enable, so an empty one means the plugin has never run.
+  const script = html.split('<script>')[1];
+  assert.match(script, /var neverRan = !setup\.version;/);
+  assert.match(script, /is the plugin enabled\? Enable it on the plugin card/);
+  assert.match(script, /'Not running yet — enable the plugin on its card'/);
+});

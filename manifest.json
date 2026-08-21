@@ -1,7 +1,7 @@
 {
   "id": "seerr-notify",
   "name": "Seerr Notifications",
-  "version": "1.14.0",
+  "version": "1.14.1",
   "type": "extension",
   "main": "dist/index.js",
   "description": "Deliver Seerr request and issue notifications over WhatsApp, formatted per recipient.",

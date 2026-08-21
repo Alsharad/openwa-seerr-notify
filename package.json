@@ -1,6 +1,6 @@
 {
   "name": "openwa-seerr-notify",
-  "version": "1.14.0",
+  "version": "1.14.1",
   "private": true,
   "type": "module",
   "description": "OpenWA plugin: deliver Seerr notifications over WhatsApp, routed per recipient.",
