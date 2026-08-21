@@ -96,7 +96,7 @@ test('a disabled row, or one with no number, is not a recipient', () => {
 
   assert.throws(
     () => readConfig({ ...base, users: [{ seerrUserId: 1, number: '', enabled: true }] }),
-    /no recipients enabled/,
+    /No recipients yet/,
   );
 });
 

@@ -1,5 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 import type { PluginNetResponse } from './types/openwa';
 import { probeSeerr } from './probe.ts';
 
@@ -36,8 +41,9 @@ test('a reachable Seerr with a valid key reports its version', async () => {
   const result = await probeSeerr(deps(fetch));
   assert.equal(result.ok, true);
   assert.equal(result.version, '2.7.3');
-  assert.match(result.message, /Seerr 2\.7\.3 at http:\/\/seerr\.example\.test:5055/);
-  assert.match(result.message, /API key accepted/);
+  // Just the version. The dashboard renders its own success icon and title, so the message carries the
+  // one fact that toast cannot — not the verdict, and not the address the operator just typed in.
+  assert.equal(result.message, 'Seerr v2.7.3');
 });
 
 test('the update check is suppressed so the probe cannot wait on GitHub', async () => {
@@ -49,17 +55,23 @@ test('the update check is suppressed so the probe cannot wait on GitHub', async 
   assert.match(String(status), /checkUpdateAvailable=false$/);
 });
 
-test('an unreachable host names the two allowlists that usually cause it', async () => {
+test('an unreachable host names the address and the one env var that usually causes it', async () => {
   const { fetch } = fetcher({
     status: async () => {
-      throw new Error('host not allowed by plugin net.allow');
+      throw new Error('connect ECONNREFUSED 10.0.0.9:5055');
     },
   });
   const result = await probeSeerr(deps(fetch));
   assert.equal(result.ok, false);
-  assert.match(result.message, /cannot reach/);
-  assert.match(result.message, /net\.allow/);
+  // The address belongs in a failure — it is the thing to go and check — along with the reason and the
+  // one environment variable that actually explains it.
+  assert.match(result.message, /Cannot reach http:\/\/seerr\.example\.test:5055/);
+  assert.match(result.message, /ECONNREFUSED/);
   assert.match(result.message, /SSRF_ALLOWED_HOSTS/);
+  // net.allow stopped being advice when the manifest went to ['*'] in 1.9.0. Asserted against the source,
+  // not the message: a stubbed error is free to mention anything, and here one did.
+  const source = readFileSync(join(HERE, 'probe.ts'), 'utf8');
+  assert.doesNotMatch(source, /net\.allow/, 'the probe must not send operators to edit a manifest allow-list');
 });
 
 test('a rejected API key is reported separately from an unreachable host', async () => {
@@ -68,14 +80,14 @@ test('a rejected API key is reported separately from an unreachable host', async
   assert.equal(result.ok, false);
   assert.equal(result.version, '2.7.3');
   assert.match(result.message, /reachable/);
-  assert.match(result.message, /API key was rejected \(HTTP 403\)/);
+  assert.match(result.message, /Seerr v2\.7\.3 reachable, but the API key was rejected\./);
 });
 
-test('a URL that answers but is not Seerr is called out as the wrong URL', async () => {
+test('a URL that answers but is not Seerr says so', async () => {
   const { fetch } = fetcher({ status: async () => res(200, '<html>router login</html>') });
   const result = await probeSeerr(deps(fetch));
   assert.equal(result.ok, false);
-  assert.match(result.message, /not with a Seerr status payload/);
+  assert.match(result.message, /it is not a Seerr server/);
 });
 
 test('a non-2xx status endpoint reports the HTTP code', async () => {
@@ -87,7 +99,8 @@ test('a non-2xx status endpoint reports the HTTP code', async () => {
 
 test('missing settings are reported without any request going out', async () => {
   const { fetch, urls } = fetcher({});
-  assert.match((await probeSeerr({ fetch, baseUrl: '', apiKey: 'k' })).message, /no Seerr URL/);
-  assert.match((await probeSeerr({ fetch, baseUrl: 'http://x', apiKey: '' })).message, /no Seerr API key/);
+  // Each names the field to fill and the tab it is on, rather than restating the absence.
+  assert.match((await probeSeerr({ fetch, baseUrl: '', apiKey: 'k' })).message, /Add your Seerr address on the Connection tab\./);
+  assert.match((await probeSeerr({ fetch, baseUrl: 'http://x', apiKey: '' })).message, /Add your Seerr API key on the Connection tab\./);
   assert.deepEqual(urls, []);
 });

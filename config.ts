@@ -169,7 +169,7 @@ export function readConfig(raw: Record<string, unknown>): SeerrConfig {
   const users = readUsers(raw.users, rosterIndex(roster));
   if (users.length === 0) {
     throw new Error(
-      'seerr-notify: no recipients enabled — open Configure > Recipients, enable at least one Seerr user and give them a WhatsApp number',
+      'No recipients yet — tick someone on the Recipients tab and add their WhatsApp number.',
     );
   }
 

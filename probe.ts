@@ -49,8 +49,8 @@ async function get(deps: ProbeDeps, path: string, withKey: boolean): Promise<Plu
  * Never throws — every outcome is a message the operator can act on.
  */
 export async function probeSeerr(deps: ProbeDeps): Promise<ProbeResult> {
-  if (!deps.baseUrl) return { ok: false, message: 'no Seerr URL configured' };
-  if (!deps.apiKey) return { ok: false, message: 'no Seerr API key configured' };
+  if (!deps.baseUrl) return { ok: false, message: 'Add your Seerr address on the Connection tab.' };
+  if (!deps.apiKey) return { ok: false, message: 'Add your Seerr API key on the Connection tab.' };
 
   // `checkUpdateAvailable=false` keeps /status from calling out to GitHub for an update check, which
   // would otherwise run on the probe's budget (measured: 270 ms vs 6 ms on Seerr 3.4.1). It must be the
@@ -65,15 +65,17 @@ export async function probeSeerr(deps: ProbeDeps): Promise<ProbeResult> {
   if (statusResult.status === 'rejected') {
     return {
       ok: false,
+      // The address belongs in a FAILURE — it is the thing to check. On success it is noise the operator
+      // just typed in on the previous tab.
       message:
-        `cannot reach ${deps.baseUrl} — ${describe(statusResult.reason)}. ` +
-        'Check the URL, the manifest net.allow entry, and SSRF_ALLOWED_HOSTS for a private address.',
+        `Cannot reach ${deps.baseUrl} — ${describe(statusResult.reason)}. ` +
+        'Check the address, and SSRF_ALLOWED_HOSTS if it is a private one.',
     };
   }
 
   const status = statusResult.value;
   if (!status.ok) {
-    return { ok: false, message: `${deps.baseUrl} answered HTTP ${status.status} on /api/v1/status` };
+    return { ok: false, message: `${deps.baseUrl} answered HTTP ${status.status}.` };
   }
 
   let version: string | undefined;
@@ -87,21 +89,23 @@ export async function probeSeerr(deps: ProbeDeps): Promise<ProbeResult> {
   if (!version) {
     return {
       ok: false,
-      message: `${deps.baseUrl} responded, but not with a Seerr status payload — is that the right URL?`,
+      message: `${deps.baseUrl} responded, but it is not a Seerr server.`,
     };
   }
 
   if (authResult.status === 'rejected') {
-    return { ok: false, version, message: `Seerr ${version} reachable, but the API key check failed: ${describe(authResult.reason)}` };
+    return { ok: false, version, message: `Seerr v${version} reachable, but the API key could not be checked: ${describe(authResult.reason)}.` };
   }
 
   const auth = authResult.value;
   if (auth.status === 401 || auth.status === 403) {
-    return { ok: false, version, message: `Seerr ${version} reachable, but the API key was rejected (HTTP ${auth.status})` };
+    return { ok: false, version, message: `Seerr v${version} reachable, but the API key was rejected.` };
   }
   if (!auth.ok) {
-    return { ok: false, version, message: `Seerr ${version} reachable, but /api/v1/user answered HTTP ${auth.status}` };
+    return { ok: false, version, message: `Seerr v${version} reachable, but the user list answered HTTP ${auth.status}.` };
   }
 
-  return { ok: true, version, message: `Seerr ${version} at ${deps.baseUrl} — API key accepted` };
+  // Just the one fact the dashboard's own toast cannot carry. It already renders a success icon and a
+  // title, so restating the verdict — or the address that was checked — says nothing twice over.
+  return { ok: true, version, message: `Seerr v${version}` };
 }

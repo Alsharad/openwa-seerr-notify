@@ -346,7 +346,7 @@ export default class SeerrNotifyPlugin implements IPlugin {
    * every hiccup stops being a signal.
    */
   async healthCheck(): Promise<{ healthy: boolean; message?: string }> {
-    if (!this.ctx) return { healthy: true, message: 'not enabled' };
+    if (!this.ctx) return { healthy: true, message: 'Not enabled.' };
     const ctx = this.ctx;
 
     const notes: string[] = [];
@@ -362,7 +362,7 @@ export default class SeerrNotifyPlugin implements IPlugin {
       // install without one cannot notify anybody. Reporting it as a degraded-but-fine state was left
       // over from when enrichment was optional.
       healthy = false;
-      notes.push('no Seerr URL/API key configured — open Configure > Connection and fill both in');
+      notes.push('Add your Seerr address and API key on the Connection tab.');
     } else {
       const probe = await probeSeerr({
         fetch: (url, init) => ctx.net.fetch(url, init),
@@ -385,12 +385,13 @@ export default class SeerrNotifyPlugin implements IPlugin {
       const deadLetters = await readDeadLetters({ storage: ctx.storage });
       if (deadLetters.length > 0) {
         const newest = deadLetters[0];
-        notes.push(`${deadLetters.length} recent delivery failure(s), latest: ${newest.reason} at ${newest.at}`);
+        notes.push(`${deadLetters.length} recent delivery failure(s), most recently ${newest.reason}.`);
       }
     } catch (err) {
-      notes.push(`could not read the failure buffer: ${err instanceof Error ? err.message : String(err)}`);
+      notes.push(`The failure buffer could not be read: ${err instanceof Error ? err.message : String(err)}.`);
     }
 
-    return { healthy, message: notes.join('; ') };
+    // Each note is a sentence, so they join with a space rather than a semicolon.
+    return { healthy, message: notes.join(' ') };
   }
 }

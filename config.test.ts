@@ -19,8 +19,8 @@ test('maskChatId keeps only the last four digits', () => {
 });
 
 test('readConfig throws when no recipient is enabled', () => {
-  assert.throws(() => readConfig({}), /no recipients enabled/);
-  assert.throws(() => readConfig({ users: [] }), /no recipients enabled/);
+  assert.throws(() => readConfig({}), /No recipients yet/);
+  assert.throws(() => readConfig({ users: [] }), /No recipients yet/);
 });
 
 test('readConfig drops mapping rows whose number holds no digits', () => {

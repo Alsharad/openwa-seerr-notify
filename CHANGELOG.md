@@ -22,6 +22,22 @@ All notable changes to this plugin are documented here. The format follows
 - Removed the instruction to reload the page after Refresh from Seerr; the list has repainted in place
   since 1.9.0. Host placeholders read `<openwa-host>:<openwa-port>` everywhere, matching the panel.
 
+## [1.14.0] — 2026-08-21
+
+### Changed
+
+- **The health check says `Seerr v3.4.1` and stops.** It used to say
+  `Seerr 3.4.1 at http://192.168.1.50:5055 — API key accepted`, which restated three things the operator
+  could already see: the dashboard renders its own success icon and title, and the address is what they
+  typed on the previous tab. The message now carries the one fact that toast cannot.
+- Every failure message was rewritten to the same standard — name the address (on a failure it *is* the
+  thing to check), the reason, and the fix, without the endpoint paths and status-code parentheses that
+  only meant something to whoever wrote the probe. “no Seerr URL configured” became
+  “Add your Seerr address on the Connection tab.”
+- The unreachable-host message no longer tells operators to add a `net.allow` entry. That advice went
+  stale in 1.9.0 when the manifest moved to `["*"]`, and it was sending people to edit a file inside the
+  package. A test now asserts it against the source, so it cannot come back.
+
 ## [1.13.1] — 2026-08-21
 
 ### Fixed
