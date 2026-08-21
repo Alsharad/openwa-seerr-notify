@@ -120,6 +120,29 @@ Then open **Configure** and work through the tabs — Connection, Recipients, Wh
 Enabling fails until at least one recipient is enabled with a WhatsApp number, which is deliberate: the
 plugin has nothing to do without one.
 
+### Testing it
+
+Seerr's own **Test Notification** button is a poor test rig: it only ever sends `TEST_NOTIFICATION`, so
+it exercises none of the formatting that matters, and its payload is byte-identical every time — which
+collides with OpenWA's ingress de-duplication (no delivery-id header ⇒ the id is a hash of the body), so
+the second press and every one after it is answered `200 duplicate` and never reaches the plugin. That
+dedup is doing real work — it is what stops a crash-recovery replay or a DLQ redrive from messaging
+people twice — so the answer is a better test rig, not weaker dedup.
+
+```bash
+export SEERR_INGRESS_TOKEN=<instance secret>
+export INGRESS_URL=http://<openwa-host>:2785/api/ingress/seerr-notify/seerr-prod/seerr
+
+node send-test.mjs --list                        # every event type
+node send-test.mjs                               # TEST_NOTIFICATION (admins)
+node send-test.mjs MEDIA_AVAILABLE --as alice    # poster + enrichment, to a requester
+node send-test.mjs ISSUE_COMMENT --as alice
+```
+
+Each run carries a `_nonce`, so it is always a fresh delivery and never deduplicated. `--as` is the
+Seerr username or email the event comes from; it must match a mapped, enabled recipient, since every
+event except `TEST_NOTIFICATION` is routed to its requester or reporter by default.
+
 ### Build from source
 
 ```bash
