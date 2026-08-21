@@ -43,9 +43,9 @@ export interface MediaAvailableFlags {
 export interface SeerrConnection {
   url: string;
   apiKey: string;
-  /** Enrichment will actually run: switched on AND both settings present. */
+  /** Both settings are present, so Seerr can be called. Identical to `configured`; kept as the name the
+   *  delivery path reads, since it asks "can I enrich this?" rather than "did the operator finish setup?". */
   enabled: boolean;
-  /** URL and key are both present. Separates "switched off" from "never filled in". */
   configured: boolean;
 }
 
@@ -142,6 +142,11 @@ function readUsers(raw: unknown, roster: Map<number, RosterEntry>): SeerrUser[] 
  * Split out of readConfig because the health check has to report on the connection even when readConfig
  * refuses the config as undeliverable: on a fresh install there are no recipients yet, and "test my Seerr
  * settings" is the button an operator reaches for BEFORE mapping anyone.
+ *
+ * There is no switch for this any more. The connection is what the recipient list is built from — a
+ * Seerr account is the only thing that can be mapped to a number — so a plugin without one has nobody to
+ * deliver to, and an "enrichment off" mode only ever produced thinner messages for no gain. A delivery
+ * whose enrichment call fails still goes out from the payload alone; that is a degraded call, not a mode.
  */
 export function readSeerrConnection(raw: Record<string, unknown>): SeerrConnection {
   const url = str(raw.jellyseerrUrl).replace(/\/+$/, '');
@@ -149,9 +154,7 @@ export function readSeerrConnection(raw: Record<string, unknown>): SeerrConnecti
   return {
     url,
     apiKey,
-    // Enrichment needs all three: the toggle, a base URL and a key. Missing any one degrades the
-    // plugin to payload-only formatting rather than failing the delivery.
-    enabled: bool(raw.enrichmentEnabled, true) && url !== '' && apiKey !== '',
+    enabled: url !== '' && apiKey !== '',
     configured: url !== '' && apiKey !== '',
   };
 }

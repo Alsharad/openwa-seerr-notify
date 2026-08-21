@@ -137,7 +137,6 @@
   .icon:disabled { opacity: .35; cursor: default; }
   .icon.wide { width: auto; padding: 0 11px; font: inherit; font-size: 12px; }
   .icon.wide[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
-  .icon.danger:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); }
   .icon.armed { color: var(--danger); background: var(--danger-soft); }
 
   .btn {
@@ -195,29 +194,26 @@
   .switch .txt small { display: block; color: var(--ink-dim); font-size: 11px; margin-top: 2px; }
 
   /* ── Recipients ───────────────────────────────────────────────────────── */
-  .people { display: flex; flex-direction: column; gap: 6px; }
-  .person {
-    display: grid; align-items: center; gap: 9px; padding: 5px 4px 5px 10px;
-    grid-template-columns: auto minmax(0, 1fr) auto 148px auto;
-    border: 1px solid var(--edge); border-radius: var(--radius-sm); background: var(--sunk);
-    /* Cheap virtualization for a large Seerr install: off-screen rows are not laid out. */
-    content-visibility: auto; contain-intrinsic-size: auto 38px;
-  }
-  .person[hidden] { display: none; }
-  .person.off { opacity: .5; }
-  .person input[type="checkbox"] { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
-  .person .who { display: flex; align-items: center; gap: 7px; min-width: 0; }
-  .person .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-  .person .uid { font-size: 11px; color: var(--ink-dim); }
-  .person input[type="tel"] { padding: 5px 8px; font-size: 12px; }
+  .people th.tick, .people td.tick { width: 26px; padding-right: 0; }
+  .people th.uid, .people td.uid { width: 46px; text-align: right; color: var(--ink-dim); }
+  .people th.phone, .people td.phone { width: 160px; }
+  .people td { padding: 5px 8px; }
+  .people tbody tr { content-visibility: auto; contain-intrinsic-size: auto 34px; }
+  .people tbody tr.off { color: var(--ink-dim); }
+  .people tbody tr.off .name { font-weight: 500; }
+  .people tbody tr[hidden] { display: none; }
+  .people input[type="checkbox"] { display: block; width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+  .people .name { font-weight: 600; margin-right: 7px; }
+  .people td:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .people input[type="tel"] { padding: 4px 8px; font-size: 12px; }
   .pill {
-    flex: 0 0 auto; padding: 1px 6px; border-radius: 999px; font-size: 9px; font-weight: 700;
-    letter-spacing: .06em; background: var(--accent); color: var(--accent-ink);
+    display: inline-block; padding: 1px 6px; border-radius: 999px; font-size: 9px; font-weight: 700;
+    letter-spacing: .06em; background: var(--accent); color: var(--accent-ink); vertical-align: 1px;
   }
   .pill.gone { background: var(--danger); color: #fff; }
-  @media (max-width: 560px) {
-    .person { grid-template-columns: auto minmax(0, 1fr) auto; }
-    .person .uid, .person input[type="tel"] { display: none; }
+  @media (max-width: 520px) {
+    .people th.uid, .people td.uid { display: none; }
+    .people th.phone, .people td.phone { width: 120px; }
   }
 
   /* ── Routing matrix ───────────────────────────────────────────────────── */
@@ -286,9 +282,6 @@
   <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3.5V9h-5.5" />
   </symbol>
-  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
-  </symbol>
   <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
     <path d="m4 12.5 5 5L20 6.5" />
   </symbol>
@@ -314,7 +307,7 @@
 
 <section id="panel-connection" role="tabpanel" aria-labelledby="tab-connection" tabindex="0">
   <h2>Your Seerr server</h2>
-  <p class="lede">Fills notifications out with the overview, rating, cast and season status. Leave it blank and messages still send, carrying only what the webhook itself provides.</p>
+  <p class="lede">Required. Recipients are read from here, and notifications are filled out from here.</p>
 
   <div class="card">
     <div class="field">
@@ -328,14 +321,7 @@
              autocomplete="off" spellcheck="false" translate="no" />
       <small>Seerr → Settings → General → API Key. Stored masked; leave the masked value alone to keep the saved key.</small>
     </div>
-    <label class="switch" for="enrichmentEnabled">
-      <input type="checkbox" id="enrichmentEnabled" name="enrichmentEnabled" />
-      <span class="txt">
-        <b>Fill notifications out from Seerr</b>
-        <small>Off: send only what the webhook payload contains — no overview, ratings, cast or season list.</small>
-      </span>
-    </label>
-    <p class="hint" style="margin-top:10px">The health-check button on the plugin row tests these: it reports the Seerr version and whether the key was accepted.</p>
+    <p class="hint">The health-check button on the plugin row tests these: it reports the Seerr version and whether the key was accepted.</p>
   </div>
 </section>
 
@@ -361,7 +347,17 @@
     </div>
 
     <p class="hint" id="rosterEmpty" hidden>No Seerr accounts cached yet. Press Refresh from Seerr, then reload this page.</p>
-    <div class="people" id="userRows"></div>
+    <table class="people" id="userTable">
+      <thead>
+        <tr>
+          <th scope="col" class="tick"><span class="sr-only">Notify</span></th>
+          <th scope="col">User</th>
+          <th scope="col" class="uid">ID</th>
+          <th scope="col" class="phone">Phone number</th>
+        </tr>
+      </thead>
+      <tbody id="userRows"></tbody>
+    </table>
   </div>
 </section>
 
@@ -386,7 +382,6 @@
       <tbody id="routingBody"></tbody>
     </table>
   </div>
-  <p class="hint" id="adminCount"></p>
 </section>
 
 <section id="panel-options" role="tabpanel" aria-labelledby="tab-options" tabindex="0" hidden>
@@ -408,13 +403,6 @@
         <small>On: an event matching no recipient is kept as a delivery failure you can see. Off: dropped quietly.</small>
       </span>
     </label>
-    <label class="switch" for="updateCheckEnabled">
-      <input type="checkbox" id="updateCheckEnabled" name="updateCheckEnabled" />
-      <span class="txt">
-        <b>Check GitHub for new releases</b>
-        <small>Once a day. Nothing is downloaded or installed. Off: no outbound request is ever made.</small>
-      </span>
-    </label>
     <label class="switch" for="debug">
       <input type="checkbox" id="debug" name="debug" />
       <span class="txt">
@@ -434,10 +422,18 @@
   </div>
 
   <div class="card">
-    <div class="card-head" style="margin:0">
-      <p class="hint" id="updateMeta"></p>
+    <div class="card-head">
+      <h3>Updates</h3>
       <button type="button" class="btn" id="checkUpdate">Check for updates</button>
     </div>
+    <label class="switch" for="updateCheckEnabled">
+      <input type="checkbox" id="updateCheckEnabled" name="updateCheckEnabled" />
+      <span class="txt">
+        <b>Check GitHub once a day</b>
+        <small>Shows a banner when a newer release exists. Nothing is downloaded or installed. Off: no outbound request is ever made.</small>
+      </span>
+    </label>
+    <p class="hint" id="updateMeta" style="margin-top:9px"></p>
   </div>
 </section>
 
@@ -453,21 +449,21 @@
       <input type="text" id="webhookUrl" readonly aria-labelledby="urlLabel"
              spellcheck="false" translate="no" />
       <div class="acts">
-        <button type="button" class="icon" id="copyUrl" aria-label="Copy the webhook URL">
+        <button type="button" class="icon" id="copyUrl" data-icon="i-copy" aria-label="Copy the webhook URL">
           <svg width="15" height="15" aria-hidden="true"><use href="#i-copy" /></svg>
         </button>
       </div>
     </div>
 
     <div class="rail">
-      <span class="tag" id="secretLabel">Authorization Header</span>
+      <span class="tag" id="secretLabel">Auth Header</span>
       <input type="password" id="ingressSecret" readonly aria-labelledby="secretLabel"
              spellcheck="false" translate="no" placeholder="64 hex characters…" />
       <div class="acts">
         <button type="button" class="icon" id="revealSecret" aria-label="Show the secret" aria-pressed="false">
           <svg width="15" height="15" aria-hidden="true"><use href="#i-eye" /></svg>
         </button>
-        <button type="button" class="icon" id="copySecret" aria-label="Copy the secret">
+        <button type="button" class="icon" id="copySecret" data-icon="i-copy" aria-label="Copy the secret">
           <svg width="15" height="15" aria-hidden="true"><use href="#i-copy" /></svg>
         </button>
         <button type="button" class="icon" id="generateSecret" aria-label="Generate a new secret">
@@ -508,7 +504,7 @@
   'use strict';
 
   var SCALARS = ['jellyseerrUrl', 'jellyseerrApiKey', 'fallbackSessionId'];
-  var BOOLEANS = ['enrichmentEnabled', 'requireMappedUser', 'sendPoster', 'debug', 'updateCheckEnabled'];
+  var BOOLEANS = ['requireMappedUser', 'sendPoster', 'debug', 'updateCheckEnabled'];
 
   var el = function (id) { return document.getElementById(id); };
   var saveBtn = el('save');
@@ -552,6 +548,21 @@
     return svg;
   }
 
+  /**
+   * Replace a button's icon.
+   *
+   * Not replaceChild(new, button.firstChild): the markup indents its <svg>, so firstChild is the
+   * whitespace text node before it. Swapping THAT left the original icon in place and appended a second
+   * one — which is how the reveal button ended up showing two eyes.
+   */
+  function setIcon(button, name, size) {
+    var next = icon(name, size);
+    var current = button.querySelector('svg');
+    if (current) button.replaceChild(next, current);
+    else button.insertBefore(next, button.firstChild);
+    return next;
+  }
+
   // ── Clipboard ───────────────────────────────────────────────────────────
   // This frame is sandboxed with an opaque origin and, over plain http, is not a secure context — so
   // navigator.clipboard is frequently absent or rejects. execCommand is the fallback that does work
@@ -562,11 +573,9 @@
     var done = function (ok) {
       setStatus(ok ? 'Copied.' : 'Press Ctrl+C to copy the selected value.', ok);
       if (!button) return;
-      var original = button.firstChild;
-      button.replaceChild(icon('i-check'), original);
-      setTimeout(function () {
-        if (button.firstChild) button.replaceChild(original, button.firstChild);
-      }, 1400);
+      var was = button.getAttribute('data-icon') || 'i-copy';
+      setIcon(button, 'i-check');
+      setTimeout(function () { setIcon(button, was); }, 1400);
     };
 
     var scratch = sourceInput;
@@ -731,27 +740,31 @@
 
   function renderPerson(entry, mapping) {
     var label = entry.name || ('user ' + entry.id);
-    var row = document.createElement('div');
-    row.className = 'person';
+    var row = document.createElement('tr');
 
+    var tick = document.createElement('td');
+    tick.className = 'tick';
     var notify = document.createElement('input');
     notify.type = 'checkbox';
     notify.checked = mapping ? mapping.enabled !== false : false;
     notify.setAttribute('aria-label', 'Notify ' + label);
+    tick.appendChild(notify);
 
-    var who = document.createElement('div');
-    who.className = 'who';
+    var who = document.createElement('td');
     var name = document.createElement('span');
     name.className = 'name';
     name.textContent = entry.name || ('User ' + entry.id);
     who.appendChild(name);
     if (entry.isAdmin) who.appendChild(pill('ADMIN'));
+    // Not removable from here — Seerr owns the list — so say why the row is there instead.
     if (entry.missing) who.appendChild(pill('NOT IN SEERR', 'gone'));
 
-    var uid = document.createElement('span');
+    var uid = document.createElement('td');
     uid.className = 'uid mono';
     uid.textContent = '#' + entry.id;
 
+    var cell = document.createElement('td');
+    cell.className = 'phone';
     var phone = document.createElement('input');
     phone.type = 'tel';
     phone.className = 'mono';
@@ -761,48 +774,17 @@
     phone.placeholder = '96550001234…';
     phone.value = mapping ? mapping.number || '' : '';
     phone.setAttribute('aria-label', 'WhatsApp number for ' + label);
+    cell.appendChild(phone);
 
-    function sync() { row.className = notify.checked ? 'person' : 'person off'; }
-
-    // Two presses: a cleared mapping cannot be recovered from this panel, and a sandboxed frame has no
-    // confirm() to fall back on (modals need allow-modals, which it is not given).
-    var clear = document.createElement('button');
-    clear.type = 'button';
-    clear.className = 'icon danger';
-    clear.setAttribute('aria-label', 'Clear the mapping for ' + label);
-    clear.appendChild(icon('i-trash', 14));
-    var armed = false;
-    clear.addEventListener('click', function () {
-      if (!armed) {
-        armed = true;
-        clear.classList.add('armed');
-        clear.setAttribute('aria-label', 'Press again to clear the mapping for ' + label);
-        setStatus('Press again to clear ' + label + '.', false);
-        setTimeout(function () {
-          armed = false;
-          clear.classList.remove('armed');
-          clear.setAttribute('aria-label', 'Clear the mapping for ' + label);
-        }, 4000);
-        return;
-      }
-      armed = false;
-      clear.classList.remove('armed');
-      phone.value = '';
-      notify.checked = false;
-      sync();
-      refreshCounts();
-      setStatus('Cleared ' + label + '. Save to keep it.', true);
-    });
-
+    function sync() { row.className = notify.checked ? '' : 'off'; }
     sync();
     notify.addEventListener('change', function () { sync(); refreshCounts(); });
     phone.addEventListener('input', refreshCounts);
 
-    row.appendChild(notify);
+    row.appendChild(tick);
     row.appendChild(who);
     row.appendChild(uid);
-    row.appendChild(phone);
-    row.appendChild(clear);
+    row.appendChild(cell);
 
     row.readMapping = function () {
       return { seerrUserId: entry.id, number: phone.value.trim(), enabled: notify.checked };
@@ -829,15 +811,11 @@
   function refreshCounts() {
     var rows = currentRows();
     var live = rows.filter(function (row) { return row.isLive(); });
-    var admins = live.filter(function (row) { return row.isAdmin(); });
-
     el('rosterCount').textContent = rows.length === 0
       ? 'Recipients'
       : live.length + ' of ' + rows.length + ' will be notified';
     el('rosterEmpty').hidden = rows.length > 0;
-    el('adminCount').textContent = admins.length === 0
-      ? 'Nobody notified is a Seerr admin yet, so nothing in the Admins column can be delivered.'
-      : admins.length + ' of the people you notify are Seerr admins.';
+    el('userTable').hidden = rows.length === 0;
   }
 
   // ── Setup ───────────────────────────────────────────────────────────────
@@ -879,6 +857,7 @@
       copy.type = 'button';
       copy.className = 'icon';
       copy.setAttribute('aria-label', 'Copy the command');
+      copy.setAttribute('data-icon', 'i-copy');
       copy.appendChild(icon('i-copy'));
       copy.addEventListener('click', function () { copyText(command, copy); });
 
@@ -933,7 +912,7 @@
     field.type = 'password';
     reveal.setAttribute('aria-pressed', 'false');
     reveal.setAttribute('aria-label', 'Show the secret');
-    reveal.replaceChild(icon('i-eye'), reveal.firstChild);
+    setIcon(reveal, 'i-eye');
     reveal.disabled = secret === '';
     el('copySecret').disabled = secret === '';
 
@@ -1175,7 +1154,7 @@
     field.type = shown ? 'password' : 'text';
     button.setAttribute('aria-pressed', shown ? 'false' : 'true');
     button.setAttribute('aria-label', shown ? 'Show the secret' : 'Hide the secret');
-    button.replaceChild(icon(shown ? 'i-eye' : 'i-eye-off'), button.firstChild);
+    setIcon(button, shown ? 'i-eye' : 'i-eye-off');
   });
   el('checkUpdate').addEventListener('click', function () {
     requestSetup('update', '', 'Asking GitHub for the latest release…');

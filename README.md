@@ -79,8 +79,9 @@ webhook URL read back from the gateway, generates the header secret, and spells 
 The full path:
 
 1. **Have a WhatsApp session running** in OpenWA, and note its session id.
-2. **Create a Seerr API key** (Jellyseerr/Overseerr → Settings → General → API Key) if you want
-   enrichment. Without it the plugin still delivers, using only what the webhook payload contains.
+2. **Create a Seerr API key** (Jellyseerr/Overseerr → Settings → General → API Key). It is required:
+   the recipient list is read from Seerr, so a Seerr account is the only thing that can be mapped to a
+   WhatsApp number.
 3. **Install and enable the plugin** (below). It enables with an empty config — there is nothing to
    configure before it is running, and the buttons that fetch things only work while it *is* running.
 4. **Provision an ingress instance**, if you have not got one. This is the one step with no button,
@@ -95,9 +96,9 @@ The full path:
    The response carries the ingress `secret` and the `ingressUrls[].url` — **both shown once**. If you
    keep them, you can skip the secret generation in step 6. `CreateInstanceDto` is strictly validated:
    an extra field such as `enabled` is rejected with a `400`.
-5. **Open Configure → Connection**, fill in the Seerr URL and API key, and Save. Use the health-check
-   button on the plugin row to confirm — it reports the Seerr version and whether the key was accepted,
-   and it works before any recipient exists.
+5. **Open Configure → Connection**, fill in the Seerr URL and API key, and Save. Both are required. Use
+   the health-check button on the plugin row to confirm — it reports the Seerr version and whether the
+   key was accepted, and it works before any recipient exists.
 6. **Configure → Setup** now shows the webhook URL to paste into Seerr. If you did not keep the secret
    from step 4, press **Generate a new secret** (twice — it asks) and copy the value that appears a
    second later — masked by default, with reveal, copy and regenerate icons, the same way Seerr shows
@@ -196,10 +197,9 @@ are listed because they are what the REST API and any backup will show you.
 
 | Key | Required | Default | Description |
 | --- | -------- | ------- | ----------- |
-| `users` | **yes** | `[]` | Recipient mappings, one per notified Seerr account: `{ seerrUserId, number, enabled }`. Identity and admin status come from `seerrRoster`, not from here. Nothing is delivered while none is enabled with a number. |
-| `jellyseerrUrl` | no | `""` | Seerr base URL. Empty disables enrichment. See the two allowlist gates in **Setup**. |
-| `jellyseerrApiKey` | no | `""` | Seerr API key (stored masked). Empty disables enrichment. |
-| `enrichmentEnabled` | no | `true` | Master switch for Seerr API calls. Enrichment needs this **and** a URL **and** a key. |
+| `users` | **yes** | `[]` | Recipient mappings, one per notified Seerr account: `{ seerrUserId, number, enabled }`. Identity and admin status come from `seerrRoster`, not from here; an account Seerr does not have cannot be added. Untick someone to stop notifying them. Nothing is delivered while none is enabled with a number. |
+| `jellyseerrUrl` | **yes** | `""` | Seerr base URL. See *Reaching a self-hosted Seerr*. |
+| `jellyseerrApiKey` | **yes** | `""` | Seerr API key (stored masked). Reads the user list, and fills notifications out. |
 | `requireMappedUser` | no | `true` | On: an event matching nobody is recorded as a delivery failure. Off: dropped quietly. |
 | `fallbackSessionId` | no | `""` | Session to send from when the ingress instance is not bound to one. |
 | `sendPoster` | no | `true` | Attach the poster to `MEDIA_AVAILABLE` / `MEDIA_PENDING`. |

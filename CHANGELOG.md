@@ -6,6 +6,34 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-08-21
+
+### Removed — action required
+
+- **The Seerr URL and API key are required now, and `enrichmentEnabled` is gone.** The recipient list is
+  read from Seerr, so a Seerr account is the only thing that can be mapped to a WhatsApp number — a
+  plugin without a connection has nobody to deliver to, and an “enrichment off” mode only ever produced
+  thinner messages for no gain. A delivery whose Seerr call fails still goes out from the payload alone;
+  that is a degraded call, not a mode. **Any install that had the toggle off will start enriching again.**
+- **The per-recipient delete button is gone.** Seerr owns the list, so a row cannot be added or removed
+  here — untick someone to stop notifying them. An account that has left Seerr keeps its row, badged
+  `NOT IN SEERR`, so a mapping is never silently dropped.
+
+### Changed
+
+- Recipients are a real table with **User / ID / Phone number** headers, instead of a stack of cards.
+- Updates get their own section on the Options tab, with the daily-check switch and Check for updates
+  together rather than a switch in one card and a button in another.
+- The Setup tab’s secret is labelled **Auth Header**, which is what fits the rail.
+- The Who gets what tab drops its admin tally — it restated what the Recipients tab already shows.
+
+### Fixed
+
+- **The reveal button showed two eyes.** The icon swap replaced `button.firstChild`, which is the
+  whitespace text node before the indented `<svg>` — so the original icon stayed and a second was
+  inserted beside it. Icon swaps now target the `<svg>` itself, which also fixes the copy button's
+  check-mark never swapping back.
+
 ## [1.7.0] — 2026-08-21
 
 ### Changed

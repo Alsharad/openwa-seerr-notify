@@ -238,7 +238,8 @@ test('the editor names the header the manifest actually verifies', () => {
   const signature = manifest.ingress[0].signature;
   assert.equal(signature?.scheme, 'shared-secret');
   assert.equal(signature?.header, 'Authorization');
-  assert.match(html, /Authorization Header/, 'the Setup tab must name the field the operator fills in');
+  // The tag is abbreviated to fit the rail; the guide spells the Seerr field out in full.
+  assert.match(html, /Auth Header/, 'the Setup tab must name the field the operator fills in');
 
   const rig = readFileSync(join(HERE, 'send-test.mjs'), 'utf8');
   assert.match(rig, /Authorization: TOKEN/, 'send-test.mjs would 401 against the declared header');
@@ -274,4 +275,13 @@ test('the editor keeps the interface rules that silently regress', () => {
   if (!/color-scheme:\s*dark/.test(css)) problems.push('dark theme needs color-scheme for native controls');
 
   assert.deepEqual(problems, []);
+});
+
+test('the icon sheet has no unused symbols and no missing ones', () => {
+  // The icons are inlined because the frame's CSP forbids external images. A `<use href="#…">` that
+  // resolves to nothing renders as empty space, which is exactly how a missing icon looks in a screenshot.
+  const defined = new Set([...html.matchAll(/<symbol id="(i-[a-z-]+)"/g)].map((m) => m[1]));
+  const used = new Set([...html.matchAll(/['"]#?(i-[a-z-]+)['"]/g)].map((m) => m[1]));
+  assert.deepEqual([...used].filter((name) => !defined.has(name)), [], 'icon used but never defined');
+  assert.deepEqual([...defined].filter((name) => !used.has(name)), [], 'icon defined but never used');
 });
