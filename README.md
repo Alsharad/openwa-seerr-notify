@@ -315,8 +315,9 @@ restart. Nothing is cached across deliveries.
   with the gateway's own admin key, which unloads the running plugin and installs a new package. The
   chain that makes that acceptable: the download URL comes from the GitHub release feed of the repository
   baked into the manifest **at build time** — never from config, so no config write can redirect it — and
-  it is pinned to the sha256 the release publishes beside the zip. A release with no published checksum
-  is refused. If you would rather this did not exist, delete `installUpdate` from `setup.ts`; the check
+  it is pinned to the sha256 GitHub publishes for the asset itself (`assets[].digest`), so the hash is
+  neither computed from the downloaded bytes nor transcribed by hand. A release whose asset carries no
+  digest is refused. If you would rather this did not exist, delete `installUpdate` from `setup.ts`; the check
   and the banner keep working, and `Options → Check GitHub` switches off the check entirely.
 - **⚠️ The Refresh button and the Setup tab step outside the plugin capability model.** Nothing in the
   supported surface lets a plugin write its own config: the editor is an opaque-origin sandbox with no

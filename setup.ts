@@ -264,7 +264,7 @@ async function installUpdate(
 
   let url: string;
   try {
-    url = await pinnedDownloadUrl(deps.netFetch, update);
+    url = pinnedDownloadUrl(update);
   } catch (err) {
     state.error = err instanceof Error ? err.message : String(err);
     await writePluginConfig(deps, { setup: state, setupRequestedAt: '' }).catch(() => undefined);

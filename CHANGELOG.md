@@ -6,6 +6,21 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.10.1] — 2026-08-21
+
+### Fixed
+
+- **Install it could not read the checksum, so it refused to install.** Found by pressing the button on a
+  live gateway: it fetched the published `seerr-notify.zip.sha256` sidecar through `ctx.net.fetch`, and a
+  GitHub release asset URL answers `302` — which that fetch refuses by design, since following redirects
+  is how an allow-listed host becomes a way to reach one that is not. It failed closed, which is the
+  right direction, but it failed every time.
+
+  The pin now comes from `assets[].digest` in the release response the check already makes: the sha256
+  **GitHub computed for those bytes**. No second request, no redirect to refuse, and a hash that neither
+  this plugin nor the release notes can get wrong. A release whose asset carries no digest is refused
+  rather than installed unpinned.
+
 ## [1.10.0] — 2026-08-21
 
 ### Added

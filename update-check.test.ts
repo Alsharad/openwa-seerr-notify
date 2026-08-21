@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { PluginNetResponse } from './types/openwa';
-import { checkForUpdate, isNewer, repoSlug } from './update-check.ts';
+import { checkForUpdate, isNewer, pinnedDownloadUrl, repoSlug } from './update-check.ts';
 
 const NOW = () => new Date('2026-08-21T12:00:00.000Z');
 
@@ -106,4 +106,48 @@ test('a plugin built without a GitHub repository says so instead of fetching', a
   );
   assert.equal(called, false);
   assert.equal(state.note, 'no GitHub repository is declared in the manifest');
+});
+
+test('the install pin comes from GitHub’s own digest, and a release without one is refused', async () => {
+  // The published .sha256 sidecar cannot be read through the host's guarded fetch — a release asset URL
+  // answers 302 and that fetch refuses redirects — and a hash computed from the downloaded bytes would
+  // verify nothing. GitHub returns its own `digest` on the asset in the response the check already makes.
+  const asset = (extra: Record<string, unknown>) => ({
+    name: 'seerr-notify.zip',
+    browser_download_url: 'https://github.com/o/r/releases/download/v2.0.0/seerr-notify.zip',
+    ...extra,
+  });
+
+  const withDigest = await checkForUpdate(
+    async () => reply(200, { tag_name: 'v2.0.0', assets: [asset({ digest: `sha256:${'a'.repeat(64)}` })] }),
+    'o/r',
+    '1.0.0',
+    NOW,
+  );
+  assert.equal(withDigest.sha256, 'a'.repeat(64));
+  assert.equal(
+    pinnedDownloadUrl(withDigest),
+    `https://github.com/o/r/releases/download/v2.0.0/seerr-notify.zip#sha256=${'a'.repeat(64)}`,
+  );
+
+  const noDigest = await checkForUpdate(
+    async () => reply(200, { tag_name: 'v2.0.0', assets: [asset({})] }),
+    'o/r',
+    '1.0.0',
+    NOW,
+  );
+  assert.equal(noDigest.sha256, '');
+  assert.throws(() => pinnedDownloadUrl(noDigest), /cannot be pinned/);
+
+  // A malformed digest is not a pin either, and must not be passed through.
+  const badDigest = await checkForUpdate(
+    async () => reply(200, { tag_name: 'v2.0.0', assets: [asset({ digest: 'md5:whatever' })] }),
+    'o/r',
+    '1.0.0',
+    NOW,
+  );
+  assert.equal(badDigest.sha256, '');
+
+  const noZip = await checkForUpdate(async () => reply(200, { tag_name: 'v2.0.0', assets: [] }), 'o/r', '1.0.0', NOW);
+  assert.throws(() => pinnedDownloadUrl(noZip), /publishes no seerr-notify\.zip/);
 });

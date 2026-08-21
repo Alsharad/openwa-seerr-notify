@@ -28,8 +28,8 @@ export interface UpdateState {
   note: string;
   /** Direct download for the release's seerr-notify.zip, or '' when the release ships no such asset. */
   asset: string;
-  /** Download for the zip's published sha256 sidecar. Without it an install cannot be pinned. */
-  checksum: string;
+  /** The asset's sha256 as GitHub computed it, or '' when the release predates asset digests. */
+  sha256: string;
 }
 
 /** "https://github.com/owner/repo" (or a .git / trailing-slash variant) → "owner/repo". */
@@ -90,7 +90,7 @@ export async function checkForUpdate(
     available: false,
     note: '',
     asset: '',
-    checksum: '',
+    sha256: '',
   };
   if (!slug) return { ...base, note: 'no GitHub repository is declared in the manifest' };
 
@@ -125,14 +125,14 @@ export async function checkForUpdate(
   const url = typeof release.html_url === 'string' && release.html_url ? release.html_url : base.url;
   const available = isNewer(latest, current);
 
-  // Both are needed to install from here: the zip, and the checksum published beside it. An install by
-  // URL is refused without an integrity pin on any gateway that sets PLUGIN_INSTALL_REQUIRE_PIN, and
-  // pinning to a hash this plugin computed itself would defeat the point — it has to be the published one.
+  // Both halves of an installable release come from THIS response: the download URL, and the sha256
+  // GitHub itself computed for those bytes (`digest: "sha256:<hex>"`). Taking the hash from here rather
+  // than from the published sidecar matters twice over — a hash the installer derives from the bytes it
+  // just downloaded verifies nothing, and the sidecar cannot be read through the host's guarded fetch at
+  // all, because a release asset URL answers 302 and that fetch refuses redirects.
   const assets = Array.isArray(release.assets) ? (release.assets as Array<Record<string, unknown>>) : [];
-  const download = (name: string): string => {
-    const match = assets.find((asset) => asset.name === name);
-    return typeof match?.browser_download_url === 'string' ? match.browser_download_url : '';
-  };
+  const zip = assets.find((asset) => asset.name === 'seerr-notify.zip');
+  const digest = typeof zip?.digest === 'string' ? /^sha256:([0-9a-f]{64})$/.exec(zip.digest) : null;
 
   return {
     ...base,
@@ -140,28 +140,21 @@ export async function checkForUpdate(
     url,
     available,
     note: available ? '' : 'up to date',
-    asset: download('seerr-notify.zip'),
-    checksum: download('seerr-notify.zip.sha256'),
+    asset: typeof zip?.browser_download_url === 'string' ? zip.browser_download_url : '',
+    sha256: digest ? digest[1] : '',
   };
 }
 
 /**
- * Resolve the download URL to install, with the release's own published sha256 appended as the
- * gateway's integrity pin (`…zip#sha256=<64 hex>`).
+ * The download URL to install, with GitHub's own sha256 for the asset appended as the gateway's
+ * integrity pin (`…zip#sha256=<64 hex>`).
  *
- * The hash is fetched from the release rather than computed here: a pin the installer derives from the
- * bytes it just downloaded verifies nothing. Throws with an actionable message when a release ships no
- * zip or no checksum, because in that case the operator has to install by hand.
+ * Pure — every input came from the release check, so installing needs no further network call and has
+ * no redirect to refuse. Throws with an actionable message when a release ships no zip or no digest,
+ * because in that case the operator has to install by hand rather than unpinned.
  */
-export async function pinnedDownloadUrl(fetchFn: NetFetch, update: UpdateState): Promise<string> {
+export function pinnedDownloadUrl(update: UpdateState): string {
   if (!update.asset) throw new Error(`release ${update.latest} publishes no seerr-notify.zip to install`);
-  if (!update.checksum) throw new Error(`release ${update.latest} publishes no checksum, so the install cannot be pinned`);
-
-  const res = await fetchFn(update.checksum, { headers: { Accept: 'text/plain' }, timeoutMs: TIMEOUT_MS });
-  if (!res.ok) throw new Error(`could not read the published checksum (HTTP ${res.status})`);
-
-  // The sidecar is `sha256sum` output: "<64 hex>  seerr-notify.zip".
-  const hash = /\b([0-9a-f]{64})\b/.exec(res.body.trim());
-  if (!hash) throw new Error('the published checksum file does not contain a sha256');
-  return `${update.asset}#sha256=${hash[1]}`;
+  if (!update.sha256) throw new Error(`release ${update.latest} publishes no checksum, so the install cannot be pinned`);
+  return `${update.asset}#sha256=${update.sha256}`;
 }

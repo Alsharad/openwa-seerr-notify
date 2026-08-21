@@ -185,7 +185,7 @@ test('an action replaces only what it owns', async () => {
     ...EMPTY_SETUP,
     secret: 'kept',
     secretFor: 'seerr-prod',
-    update: { current: '1.6.0', latest: '1.7.0', url: 'u', checkedAt: 'earlier', available: true, note: '', asset: '', checksum: '' },
+    update: { current: '1.6.0', latest: '1.7.0', url: 'u', checkedAt: 'earlier', available: true, note: '', asset: '', sha256: '' },
   };
   await runSetupAction(deps, previous, parseSetupAction('instances||t2')!);
 
@@ -278,13 +278,6 @@ test('an install writes what it is doing BEFORE it replaces the worker doing it'
       order.push(`${init?.method ?? 'GET'} ${url.replace('http://127.0.0.1:2785', '')}`);
       return deps.selfFetch(url, init);
     },
-    netFetch: async () => ({
-      ok: true,
-      status: 200,
-      statusText: '',
-      headers: {},
-      body: 'f'.repeat(64) + '  seerr-notify.zip',
-    }),
   };
 
   const state = {
@@ -297,7 +290,7 @@ test('an install writes what it is doing BEFORE it replaces the worker doing it'
       available: true,
       note: '',
       asset: 'https://github.com/o/r/releases/download/v1.9.9/seerr-notify.zip',
-      checksum: 'https://github.com/o/r/releases/download/v1.9.9/seerr-notify.zip.sha256',
+      sha256: 'f'.repeat(64),
     },
   };
 
@@ -317,7 +310,7 @@ test('an install is refused rather than run unpinned', async () => {
     update: {
       current: '1.6.0', latest: '1.9.9', url: 'u', checkedAt: '', available: true, note: '',
       asset: 'https://github.com/o/r/releases/download/v1.9.9/seerr-notify.zip',
-      checksum: '',
+      sha256: '',
     },
   };
   const result = await runSetupAction(deps, noChecksum, parseSetupAction('upgrade||t10')!);

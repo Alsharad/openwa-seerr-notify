@@ -349,6 +349,6 @@ test('installing an update is offered only when there is one, and never unpinned
   assert.match(script, /el\('installUpdateOptions'\)\.hidden = !offer;/);
 
   const check = readFileSync(join(HERE, 'update-check.ts'), 'utf8');
-  assert.match(check, /#sha256=\$\{hash\[1\]\}/, 'the install URL must carry an integrity pin');
+  assert.match(check, /#sha256=\$\{update\.sha256\}/, 'the install URL must carry an integrity pin');
   assert.match(check, /publishes no checksum, so the install cannot be pinned/, 'an unpinned install must be refused');
 });
