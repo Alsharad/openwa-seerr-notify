@@ -6,6 +6,20 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.11.2] — 2026-08-21
+
+### Fixed
+
+- **Install update stayed on screen with no update to install** — and it was not alone. `[hidden]` is
+  `display: none` from the browser’s own stylesheet, which sits at the very bottom of the cascade, so any
+  class rule setting a display — `.btn { display: inline-flex }` — silently defeats `element.hidden =
+  true`. Five controls were affected: both install buttons, the release-notes link, the SAVED badge and
+  the recipient table.
+
+  The rule is now stated once, `[hidden] { display: none !important }`, replacing four per-component
+  patches that had accumulated one bug at a time. A test asserts the global rule exists and that no
+  component has gone back to patching itself around it.
+
 ## [1.11.1] — 2026-08-21
 
 ### Fixed

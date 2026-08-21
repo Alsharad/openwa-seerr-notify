@@ -365,3 +365,18 @@ test('installing an update is offered only when there is one, and never unpinned
   assert.match(check, /#sha256=\$\{update\.sha256\}/, 'the install URL must carry an integrity pin');
   assert.match(check, /publishes no checksum, so the install cannot be pinned/, 'an unpinned install must be refused');
 });
+
+test('hiding an element actually hides it, whatever its class sets', () => {
+  // `[hidden]` is `display: none` from the UA sheet, at the bottom of the cascade — so any class rule
+  // that sets a display defeats `element.hidden = true`. Five controls were affected before this was
+  // stated once, including Install update, which stayed on screen with no update to install.
+  const css = html.split('</style>')[0];
+  const script = html.split('<script>')[1];
+  assert.match(css, /\[hidden\]\s*\{\s*display:\s*none\s*!important/, 'the global rule is what makes hidden reliable');
+
+  // And it has to cover everything the script hides, so nothing needs its own patch again.
+  const hidden = [...script.matchAll(/el\('([^']+)'\)\.hidden/g)].map((m) => m[1]);
+  assert.ok(hidden.length > 0, 'expected the script to hide something');
+  const patches = [...css.matchAll(/([^\n{]*\[hidden\][^\n{]*)\{/g)].map((m) => m[1].trim());
+  assert.deepEqual(patches, ['[hidden]'], 'a per-component [hidden] patch means the global rule is being worked around');
+});

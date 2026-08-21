@@ -48,6 +48,11 @@
   }
 
   * { box-sizing: border-box; }
+  /* The UA gives [hidden] `display: none` at the very bottom of the cascade, so ANY class rule that sets
+     a display — `.btn { display: inline-flex }` — silently defeats `element.hidden = true`. That is how
+     Install update stayed on screen with no update to install. Stated once, for every element, instead of
+     being patched per component as each one is caught. */
+  [hidden] { display: none !important; }
   body {
     margin: 0 auto; padding: 14px 16px 18px; max-width: 760px;
     font: 13px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -87,7 +92,6 @@
   }
   .tabs button:hover { color: var(--ink); }
   .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
-  section[hidden] { display: none; }
   section:focus:not(:focus-visible) { outline: none; }
 
   /* ── Card: the only sectioning device, on every tab ───────────────────── */
@@ -173,7 +177,6 @@
   .field { margin-bottom: 12px; }
   .field > label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
   .field > label .pill { margin-left: 6px; vertical-align: 1px; }
-  .pill[hidden] { display: none; }
   .field small { display: block; color: var(--ink-dim); font-size: 11px; margin-top: 5px; }
   input[type="text"], input[type="password"], input[type="tel"], input[type="search"], select {
     width: 100%; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--ink);
@@ -206,7 +209,6 @@
   .people tbody tr { content-visibility: auto; contain-intrinsic-size: auto 34px; }
   .people tbody tr.off { color: var(--ink-dim); }
   .people tbody tr.off .name { font-weight: 500; }
-  .people tbody tr[hidden] { display: none; }
   .people input[type="checkbox"] { display: block; width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
   .people .name { font-weight: 600; margin-right: 7px; }
   .people td:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -245,7 +247,6 @@
     padding: 8px 12px; margin-bottom: 12px; font-size: 12px;
     border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-soft);
   }
-  #updateBanner[hidden] { display: none; }
   #updateBanner a { display: inline-flex; align-items: center; gap: 5px; }
 
   /* ── Footer ───────────────────────────────────────────────────────────── */
