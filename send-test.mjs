@@ -30,6 +30,9 @@
 //                        instance was created
 //                        (regenerate: POST /api/integration/plugins/seerr-notify/instances/<id>/regenerate-secret)
 //   INGRESS_URL          default http://localhost:2785/api/ingress/seerr-notify/seerr-prod/seerr
+//                        The last path segment before /seerr is your INSTANCE id, which you chose when
+//                        you created it — `seerr-prod` is only the name the docs use. Copy the real URL
+//                        from the plugin's Setup tab if yours differs.
 //   TMDB_ID              default 693134 (Dune: Part Two) — the title enrichment will look up
 
 const INGRESS_URL =

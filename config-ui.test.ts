@@ -397,3 +397,17 @@ test('hiding an element actually hides it, whatever its class sets', () => {
   const patches = [...css.matchAll(/([^\n{]*\[hidden\][^\n{]*)\{/g)].map((m) => m[1].trim());
   assert.deepEqual(patches, ['[hidden]'], 'a per-component [hidden] patch means the global rule is being worked around');
 });
+
+test('the instance picker chooses the URL, not just the secret', () => {
+  // The instance id is a path segment in the webhook URL, so with two instances the panel has two URLs
+  // to offer. It used to show the first one and let the picker select only which instance got a new
+  // secret — leaving the second instance's URL unreachable from a panel that already knew it.
+  const script = html.split('<script>')[1];
+  assert.match(script, /var wanted = selectedInstance \|\| setup\.secretFor;/);
+  assert.match(
+    script,
+    /var chosen = instances\.filter\(function \(i\) \{ return i\.instanceId === wanted; \}\)\[0\] \|\| instances\[0\];/,
+    'the shown URL must follow the picked instance',
+  );
+  assert.match(script, /el\('secretInstance'\)\.addEventListener\('change'/, 'picking must repaint');
+});

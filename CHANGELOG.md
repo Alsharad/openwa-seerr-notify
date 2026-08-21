@@ -22,6 +22,21 @@ All notable changes to this plugin are documented here. The format follows
 - Removed the instruction to reload the page after Refresh from Seerr; the list has repainted in place
   since 1.9.0. Host placeholders read `<openwa-host>:<openwa-port>` everywhere, matching the panel.
 
+## [1.13.1] — 2026-08-21
+
+### Fixed
+
+- **With more than one ingress instance, the Setup tab only ever showed the first one's webhook URL.**
+  The instance id is a path segment in that URL, so two instances mean two URLs; the picker selected only
+  which instance got a new secret. It now selects which instance the tab is about, URL included.
+
+### Documentation
+
+- Spelled out that **`seerr-prod` is a name you pick**, not part of the address. It becomes a path
+  segment — `/api/ingress/seerr-notify/<your-instance-id>/seerr` — so every example that says
+  `seerr-prod` means "whatever you called it", and the Setup tab reads the real URL back from the gateway
+  rather than composing one. `send-test.mjs` says the same about its default.
+
 ## [1.13.0] — 2026-08-21
 
 ### Changed

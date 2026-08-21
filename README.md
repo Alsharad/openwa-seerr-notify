@@ -100,6 +100,11 @@ The full path:
    The response carries the ingress `secret` and the `ingressUrls[].url` — **both shown once**. If you
    keep them, you can skip the secret generation in step 6. `CreateInstanceDto` is strictly validated:
    an extra field such as `enabled` is rejected with a `400`.
+
+   **`seerr-prod` is a name you pick, not a fixed one.** It becomes a path segment in your webhook URL —
+   `/api/ingress/seerr-notify/<your-instance-id>/seerr` — so every example below that says `seerr-prod`
+   means "whatever you called it". Nothing needs to guess: the Setup tab reads the finished URL back from
+   the gateway and shows you the real one to copy.
 5. **Open Configure → Connection**, fill in the Seerr URL and API key, and Save. Both are required. Use
    the health-check button on the plugin row to confirm — it reports the Seerr version and whether the
    key was accepted, and it works before any recipient exists.

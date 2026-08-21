@@ -564,6 +564,8 @@
   var pending = null;
   /** Set once an install has been confirmed by the replacement worker; the banner reads it until reload. */
   var installedVersion = '';
+  /** Which ingress instance the Setup tab is showing, when there is more than one. */
+  var selectedInstance = '';
   var SETUP_POLL_MS = [2500, 5000, 9000];
   /** An install downloads a package, swaps the worker and waits for the replacement to report in. */
   var UPGRADE_POLL_MS = [2000, 3000, 4000, 6000, 8000, 10000];
@@ -938,20 +940,23 @@
       picker.appendChild(option);
     });
 
+    // With more than one instance the picker chooses which one the tab is about — its URL as well as its
+    // secret. It used to select only the secret, so a second instance's webhook URL was unreachable from
+    // here even though the panel knew it.
+    picker.hidden = instances.length < 2;
+    var wanted = selectedInstance || setup.secretFor;
+    var chosen = instances.filter(function (i) { return i.instanceId === wanted; })[0] || instances[0];
+    if (chosen) picker.value = chosen.instanceId;
+
     // buildIngressUrls returns a bare path when the gateway has no BASE_URL — the host is the operator's
     // to supply, and guessing it here would hand Seerr a URL that silently never connects.
-    var chosen = instances.length > 1 && setup.secretFor
-      ? instances.filter(function (i) { return i.instanceId === setup.secretFor; })[0] || instances[0]
-      : instances[0];
     var url = chosen ? chosen.url || '' : '';
     var shown = !chosen ? '' : (chosen.relative ? 'http://<openwa-host>:<openwa-port>' + url : url);
 
     el('webhookUrl').value = shown;
     el('webhookUrl').title = shown;
     el('copyUrl').disabled = shown === '';
-    picker.hidden = instances.length < 2;
     el('generateSecret').disabled = instances.length === 0;
-    if (setup.secretFor) picker.value = setup.secretFor;
   }
 
   function renderSetup() {
@@ -1311,6 +1316,10 @@
     var empty = el('seerrApiKey').value === '';
     el('revealApiKey').disabled = empty;
     el('copyApiKey').disabled = empty;
+  });
+  el('secretInstance').addEventListener('change', function () {
+    selectedInstance = el('secretInstance').value;
+    renderSetup();
   });
   el('updateCheckEnabled').addEventListener('change', renderSetup);
   el('checkUpdate').addEventListener('click', function () {
