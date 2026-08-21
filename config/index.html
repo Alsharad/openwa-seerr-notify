@@ -291,13 +291,19 @@
   <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
     <path d="m4 12.5 5 5L20 6.5" />
   </symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3v12M7.5 10.5 12 15l4.5-4.5" /><path d="M4 18v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1" />
+  </symbol>
   <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
     <path d="M14 4h6v6M20 4l-9 9" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
   </symbol>
 </svg>
 
 <div id="updateBanner" hidden>
-  <span><b id="updateLatest"></b> is out — you are running <span id="updateCurrent" class="mono"></span>.</span>
+  <span><b id="updateLatest"></b> is out — you are running <span id="updateCurrent" class="mono"></span>.<span id="updateNote"></span></span>
+  <button type="button" class="btn" id="installUpdate">
+    <svg width="13" height="13" aria-hidden="true"><use href="#i-download" /></svg>Install it
+  </button>
   <a id="updateLink" href="https://github.com/Alsharad/openwa-seerr-notify/releases" rel="noopener noreferrer">
     Release notes<svg width="13" height="13" aria-hidden="true"><use href="#i-external" /></svg>
   </a>
@@ -423,7 +429,12 @@
   <div class="card">
     <div class="card-head">
       <h3>Updates</h3>
-      <button type="button" class="btn" id="checkUpdate">Check now</button>
+      <span style="display:flex; gap:8px">
+        <button type="button" class="btn" id="installUpdateOptions" hidden>
+          <svg width="13" height="13" aria-hidden="true"><use href="#i-download" /></svg>Install update
+        </button>
+        <button type="button" class="btn" id="checkUpdate">Check now</button>
+      </span>
     </div>
     <label class="switch" for="updateCheckEnabled">
       <input type="checkbox" id="updateCheckEnabled" name="updateCheckEnabled" />
@@ -950,13 +961,24 @@
     if (!el('updateCheckEnabled').checked) parts.push('daily checks off');
     el('updateMeta').textContent = parts.join(' · ');
 
+    var installing = !!(setup.upgradingTo || (pending && pending.action === 'upgrade'));
+    var offer = !!(update && update.available) && !installing;
+
     var banner = el('updateBanner');
-    banner.hidden = !(update && update.available);
-    if (update && update.available) {
+    banner.hidden = !(update && update.available) && !installing;
+    if (installing) {
+      el('updateLatest').textContent = 'Installing version ' + (setup.upgradingTo || (update || {}).latest || '');
+      el('updateCurrent').textContent = setup.version || '';
+      el('updateNote').textContent = ' — reload the dashboard in a few seconds.';
+    } else if (update && update.available) {
       el('updateLatest').textContent = 'Version ' + update.latest;
       el('updateCurrent').textContent = update.current;
+      el('updateNote').textContent = '';
       el('updateLink').href = update.url;
     }
+    el('installUpdate').hidden = !offer;
+    el('updateLink').hidden = installing;
+    el('installUpdateOptions').hidden = !offer;
   }
 
   function requestSetup(action, arg, label) {
@@ -1011,6 +1033,7 @@
 
   /** What to say once the plugin's answer lands — the next step, not "OK". */
   function setupDone(action) {
+    if (action === 'upgrade') return 'Installing — reload the dashboard in a few seconds.';
     if (action === 'roster') return 'Recipient list updated.';
     if (action === 'secret') return 'New secret ready — copy it into Seerr.';
     if (action === 'instances') return 'Instance list updated.';
@@ -1210,6 +1233,30 @@
   el('checkUpdate').addEventListener('click', function () {
     requestSetup('update', '', 'Asking GitHub for the latest release…');
   });
+
+  // Two presses. This replaces the running plugin — config and recipients survive, but WhatsApp
+  // deliveries stop for the few seconds the worker is being swapped, and a sandboxed frame has no
+  // confirm() to fall back on.
+  var armedUpgrade = false;
+  function armInstall(button) {
+    if (!armedUpgrade) {
+      armedUpgrade = true;
+      button.classList.add('armed');
+      button.textContent = 'Press again to install';
+      setStatus('This replaces the running plugin. Your settings are kept.', false);
+      setTimeout(function () {
+        if (!armedUpgrade) return;
+        armedUpgrade = false;
+        renderSetup();
+        setStatus('', true);
+      }, 8000);
+      return;
+    }
+    armedUpgrade = false;
+    requestSetup('upgrade', '', 'Installing…');
+  }
+  el('installUpdate').addEventListener('click', function () { armInstall(el('installUpdate')); });
+  el('installUpdateOptions').addEventListener('click', function () { armInstall(el('installUpdateOptions')); });
   el('repoLink').addEventListener('click', function (event) { openExternal(event, el('repoLink').href); });
   el('updateLink').addEventListener('click', function (event) { openExternal(event, el('updateLink').href); });
 

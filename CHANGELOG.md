@@ -6,6 +6,33 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.10.0] — 2026-08-21
+
+### Added
+
+- **Install an update from the panel.** The banner grows an **Install it** button, and Options an
+  **Install update** button beside Check now. Both take two presses. This exists because there is no UI
+  path otherwise: the dashboard’s upload button creates rather than replaces (`Plugin "seerr-notify" is
+  already installed`), and its in-place Update button only appears for plugins in OpenWA’s remote
+  catalog, which a side-loaded plugin is not.
+
+  It calls `POST /plugins/:id/update`, which **keeps your config, recipients and enabled state** — unlike
+  uninstall-then-install. Two properties make it safe to sit behind a button: the URL comes from the
+  release feed of the repository baked into the manifest at build time, never from config; and it is
+  pinned to the `sha256` the release publishes beside the zip, not one computed from the bytes just
+  downloaded, which would verify nothing. A release without a published checksum is refused rather than
+  installed unpinned.
+
+  The ordering is the design: that endpoint unloads the plugin making the call, so the state is written
+  first — carrying the version being installed — and the replacement clears the marker on its next
+  background pass. A success never gets to report itself; a failure leaves the worker alive to write why.
+
+### Documentation
+
+- The README and both release pages now distinguish first install from upgrading, and show the
+  `#sha256=` integrity pin. A gateway with `PLUGIN_INSTALL_REQUIRE_PIN` refuses an unpinned URL, which
+  is not obvious from the error until you have hit it.
+
 ## [1.9.2] — 2026-08-21
 
 ### Fixed

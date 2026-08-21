@@ -165,7 +165,7 @@ test('the Setup buttons stamp tokens the plugin actually acts on', () => {
   // The editor's only channel to the plugin is a token string in config. Both halves are written by
   // hand, in different languages, and neither compiler sees the other — so assert them against each other.
   const actions = [...html.matchAll(/requestSetup\('([^']+)'/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(actions)].sort(), ['instances', 'secret', 'update']);
+  assert.deepEqual([...new Set(actions)].sort(), ['instances', 'secret', 'update', 'upgrade']);
 
   const stamp = /setupToken = action \+ '\|' \+ \(arg \|\| ''\) \+ '\|' \+ new Date\(\).toISOString\(\)/.test(html);
   assert.ok(stamp, 'the token format changed; parseSetupAction has to change with it');
@@ -313,7 +313,7 @@ test('every button that waits on the plugin waits the same way', () => {
   // Setup buttons repainted themselves. One mechanism, one signal (`setup.lastAction`), one repaint.
   const starts = [...html.matchAll(/requestPlugin\(([^,]+), '([a-z]+)'/g)].map((m) => m[2]);
   const viaSetup = [...html.matchAll(/requestSetup\('([a-z]+)'/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(starts.concat(viaSetup))].sort(), ['instances', 'roster', 'secret', 'update']);
+  assert.deepEqual([...new Set(starts.concat(viaSetup))].sort(), ['instances', 'roster', 'secret', 'update', 'upgrade']);
 
   // The plugin has to echo the roster token the same way it echoes a Setup token, or the editor waits
   // for a signal that never comes and falls back to "reload the dashboard".
@@ -337,4 +337,18 @@ test('a saved API key is neither shown nor wiped', () => {
     /if \(cfg\.jellyseerrApiKey === '' && apiKeySaved\) cfg\.jellyseerrApiKey = SECRET_SENTINEL;/,
     'an untouched key must round-trip as the sentinel, or saving wipes it',
   );
+});
+
+test('installing an update is offered only when there is one, and never unpinned', () => {
+  // The install button replaces the running plugin, so it must not appear speculatively — and the URL it
+  // hands the gateway must carry the sha256 the RELEASE published, not one derived from the bytes just
+  // downloaded, which would verify nothing.
+  const script = html.split('<script>')[1];
+  assert.match(script, /var offer = !!\(update && update\.available\) && !installing;/);
+  assert.match(script, /el\('installUpdate'\)\.hidden = !offer;/);
+  assert.match(script, /el\('installUpdateOptions'\)\.hidden = !offer;/);
+
+  const check = readFileSync(join(HERE, 'update-check.ts'), 'utf8');
+  assert.match(check, /#sha256=\$\{hash\[1\]\}/, 'the install URL must carry an integrity pin');
+  assert.match(check, /publishes no checksum, so the install cannot be pinned/, 'an unpinned install must be refused');
 });

@@ -185,7 +185,7 @@ test('an action replaces only what it owns', async () => {
     ...EMPTY_SETUP,
     secret: 'kept',
     secretFor: 'seerr-prod',
-    update: { current: '1.6.0', latest: '1.7.0', url: 'u', checkedAt: 'earlier', available: true, note: '' },
+    update: { current: '1.6.0', latest: '1.7.0', url: 'u', checkedAt: 'earlier', available: true, note: '', asset: '', checksum: '' },
   };
   await runSetupAction(deps, previous, parseSetupAction('instances||t2')!);
 
@@ -261,4 +261,73 @@ test('a version that has moved is written on its own', async () => {
   const state = await refreshSetupInBackground(deps, stale, { checkUpdates: false, intervalMs: 1 });
   assert.equal(state?.version, '1.6.0');
   assert.equal(written().length, 1);
+});
+
+test('an install writes what it is doing BEFORE it replaces the worker doing it', async () => {
+  // POST /plugins/:id/update unloads this very plugin, so a success never gets to report itself. The
+  // state — including the token the editor is waiting on — has to be on disk before the call goes out.
+  const order: string[] = [];
+  const { deps } = harness({
+    'GET https://api.github.com': {},
+    '/api/plugins/seerr-notify/config': {},
+    'POST /api/plugins/seerr-notify/update': { body: { version: '1.9.9' } },
+  });
+  const wrapped: SetupRunDeps = {
+    ...deps,
+    selfFetch: async (url, init) => {
+      order.push(`${init?.method ?? 'GET'} ${url.replace('http://127.0.0.1:2785', '')}`);
+      return deps.selfFetch(url, init);
+    },
+    netFetch: async () => ({
+      ok: true,
+      status: 200,
+      statusText: '',
+      headers: {},
+      body: 'f'.repeat(64) + '  seerr-notify.zip',
+    }),
+  };
+
+  const state = {
+    ...EMPTY_SETUP,
+    update: {
+      current: '1.6.0',
+      latest: '1.9.9',
+      url: 'https://github.com/o/r/releases/tag/v1.9.9',
+      checkedAt: '2026-08-21T12:00:00.000Z',
+      available: true,
+      note: '',
+      asset: 'https://github.com/o/r/releases/download/v1.9.9/seerr-notify.zip',
+      checksum: 'https://github.com/o/r/releases/download/v1.9.9/seerr-notify.zip.sha256',
+    },
+  };
+
+  const result = await runSetupAction(wrapped, state, parseSetupAction('upgrade||t9')!);
+  assert.equal(result.ok, true);
+  assert.equal(result.message, 'installing 1.9.9');
+  assert.deepEqual(order, [
+    'PUT /api/plugins/seerr-notify/config',
+    'POST /api/plugins/seerr-notify/update',
+  ], 'the record must be written first — afterwards there is no worker left to write it');
+});
+
+test('an install is refused rather than run unpinned', async () => {
+  const { deps } = harness();
+  const noChecksum = {
+    ...EMPTY_SETUP,
+    update: {
+      current: '1.6.0', latest: '1.9.9', url: 'u', checkedAt: '', available: true, note: '',
+      asset: 'https://github.com/o/r/releases/download/v1.9.9/seerr-notify.zip',
+      checksum: '',
+    },
+  };
+  const result = await runSetupAction(deps, noChecksum, parseSetupAction('upgrade||t10')!);
+  assert.equal(result.ok, false);
+  assert.match(result.message, /cannot be pinned/);
+});
+
+test('an install with nothing newer to install says so', async () => {
+  const { deps } = harness();
+  const result = await runSetupAction(deps, EMPTY_SETUP, parseSetupAction('upgrade||t11')!);
+  assert.equal(result.ok, false);
+  assert.match(result.message, /no newer release/);
 });

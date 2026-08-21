@@ -20,7 +20,7 @@
 
 import { gatewayRequest, writePluginConfig } from './gateway.ts';
 import type { GatewayDeps } from './gateway.ts';
-import { checkForUpdate } from './update-check.ts';
+import { checkForUpdate, pinnedDownloadUrl } from './update-check.ts';
 import type { UpdateState } from './update-check.ts';
 import type { NetFetch } from './seerr-client.ts';
 
@@ -51,6 +51,8 @@ export interface SetupState {
   secretFor: string;
   secretAt: string;
   update: UpdateState | null;
+  /** Version an install was started for, so the panel can say what is being installed. */
+  upgradingTo: string;
   /** Echoes the token that produced this state — how the editor knows its click landed. */
   lastAction: string;
   /** Empty on success; the reason on failure, rendered in the editor. */
@@ -65,6 +67,7 @@ export const EMPTY_SETUP: SetupState = {
   secretFor: '',
   secretAt: '',
   update: null,
+  upgradingTo: '',
   lastAction: '',
   error: '',
 };
@@ -81,13 +84,14 @@ export function readSetup(raw: unknown): SetupState {
     secretFor: str(row.secretFor),
     secretAt: str(row.secretAt),
     update: (row.update ?? null) as UpdateState | null,
+    upgradingTo: str(row.upgradingTo),
     lastAction: str(row.lastAction),
     error: str(row.error),
   };
 }
 
 export interface SetupAction {
-  name: 'instances' | 'secret' | 'update';
+  name: 'instances' | 'secret' | 'update' | 'upgrade';
   /** The instance id, for `secret`. Empty otherwise. */
   arg: string;
   /** The whole token, echoed back so the write cannot loop and the editor can confirm the round trip. */
@@ -104,7 +108,7 @@ export interface SetupAction {
 export function parseSetupAction(raw: unknown): SetupAction | null {
   if (typeof raw !== 'string' || raw === '') return null;
   const [name, arg = ''] = raw.split('|');
-  if (name !== 'instances' && name !== 'secret' && name !== 'update') return null;
+  if (name !== 'instances' && name !== 'secret' && name !== 'update' && name !== 'upgrade') return null;
   if (name === 'secret' && !/^[a-zA-Z0-9_-]{1,64}$/.test(arg)) return null;
   return { name, arg, token: raw };
 }
@@ -202,6 +206,8 @@ export async function runSetupAction(
       // rotate, so it is swallowed.
       state.instances = await discoverInstances(deps).catch(() => state.instances);
       message = `rotated the ingress secret for "${action.arg}"`;
+    } else if (action.name === 'upgrade') {
+      return await installUpdate(deps, state, action);
     } else {
       state.update = await checkForUpdate(deps.netFetch, deps.repoSlug, deps.version, now);
       message = state.update.available
@@ -231,6 +237,70 @@ export async function runSetupAction(
 }
 
 /**
+ * Install the release the last check found, in place, keeping config and the enabled state.
+ *
+ * The order here is the whole design. `POST /plugins/:id/update` unloads and replaces the plugin — which
+ * is THIS worker — so anything that must be recorded has to be written BEFORE the call, and nothing can
+ * be written after it succeeds. So the state is written first, carrying the token the editor is waiting
+ * on and the version being installed; then the install runs. A failure leaves this worker alive to write
+ * the reason; a success takes it down mid-request, and the replacement's background pass writes the new
+ * version a few seconds later.
+ *
+ * Two properties make this safe enough to sit behind a button: the URL comes from the release feed of the
+ * repository baked into the manifest at build time, never from config, and it is pinned to the sha256
+ * the release publishes beside the zip — not one computed from the downloaded bytes.
+ */
+async function installUpdate(
+  deps: SetupRunDeps,
+  state: SetupState,
+  action: SetupAction,
+): Promise<SetupRunResult> {
+  const update = state.update;
+  if (!update || !update.available) {
+    state.error = 'no newer release to install — check for updates first';
+    await writePluginConfig(deps, { setup: state, setupRequestedAt: '' }).catch(() => undefined);
+    return { ok: false, state, message: state.error };
+  }
+
+  let url: string;
+  try {
+    url = await pinnedDownloadUrl(deps.netFetch, update);
+  } catch (err) {
+    state.error = err instanceof Error ? err.message : String(err);
+    await writePluginConfig(deps, { setup: state, setupRequestedAt: '' }).catch(() => undefined);
+    return { ok: false, state, message: state.error };
+  }
+
+  state.upgradingTo = update.latest;
+  try {
+    await writePluginConfig(deps, { setup: state, setupRequestedAt: '' });
+  } catch (err) {
+    // Refuse to install what cannot be recorded: the operator would watch the plugin restart with no
+    // idea whether it worked, and a failure afterwards would have nowhere to report itself.
+    return { ok: false, state, message: `could not record the install before starting it: ${String(err)}` };
+  }
+
+  const res = await gatewayRequest(deps, `/api/plugins/${deps.pluginId}/update`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  }).catch((err: unknown) => {
+    // A rejection here is the expected shape of SUCCESS as often as failure: the worker is torn down
+    // while its own request is in flight. Report it as started rather than failed.
+    return { ok: true, status: 0, body: String(err) };
+  });
+
+  if (!res.ok) {
+    state.error = `installing ${update.latest} failed: HTTP ${res.status} ${res.body.slice(0, 200)}`;
+    state.upgradingTo = '';
+    await writePluginConfig(deps, { setup: state, setupRequestedAt: '' }).catch(() => undefined);
+    return { ok: false, state, message: state.error };
+  }
+
+  return { ok: true, state, message: `installing ${update.latest}` };
+}
+
+/**
  * The background pass that runs shortly after enable, so the Setup tab is already populated the first
  * time it is opened and the update banner can appear without anyone asking for it.
  *
@@ -248,6 +318,12 @@ export async function refreshSetupInBackground(
   // after an upgrade, without waiting for a release check that may be switched off.
   let changed = state.version !== deps.version;
   state.version = deps.version;
+  // The replacement worker clears the marker its predecessor set, which is the only honest confirmation
+  // that an install finished: the process that started it did not survive to report anything.
+  if (state.upgradingTo && state.upgradingTo === deps.version) {
+    state.upgradingTo = '';
+    changed = true;
+  }
 
   try {
     state.instances = await discoverInstances(deps);

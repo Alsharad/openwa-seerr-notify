@@ -132,19 +132,44 @@ It names the cause.
 ## Install
 
 Download `seerr-notify.zip` from [Releases](https://github.com/Alsharad/openwa-seerr-notify/releases),
-then either drop it into the dashboard (**Plugins → Install plugin**) or upload it over the API:
+then drop it into the dashboard (**Plugins → Install plugin**) or upload it over the API:
 
 ```bash
-curl -X POST http://<openwa-host>:2785/api/plugins/install \
+curl -X POST http://<openwa-host>:<openwa-port>/api/plugins/install \
   -H "X-API-Key: <ADMIN_KEY>" -F 'file=@seerr-notify.zip'
 
-curl -X POST http://<openwa-host>:2785/api/plugins/seerr-notify/enable \
+curl -X POST http://<openwa-host>:<openwa-port>/api/plugins/seerr-notify/enable \
   -H "X-API-Key: <ADMIN_KEY>"
 ```
 
 Then open **Configure** and work through the tabs — Connection, Recipients, Who gets what, Options, and
-Setup for the Seerr side. The plugin enables with an empty config; the health check and the log tell you what is still
-missing.
+Setup for the Seerr side. The plugin enables with an empty config; the health check and the log tell you
+what is still missing.
+
+### Upgrading an existing install
+
+From **v1.10.0** the panel does this for you: when a newer release exists, the banner offers **Install
+it**. Everything below is what that button does, and how to do it by hand from an older version.
+
+**Uploading a newer zip is rejected with `Plugin "seerr-notify" is already installed`.** The dashboard's
+upload button creates; it does not replace. Its in-place Update button appears only for plugins listed in
+OpenWA's remote catalog, which a side-loaded plugin is not. The endpoint that does replace one is
+`POST /plugins/:id/update`, and it **preserves your config, your recipients and the enabled state** —
+which uninstall-then-install does not:
+
+```bash
+# The sha256 is on the release page, next to the zip.
+curl -X POST http://<openwa-host>:<openwa-port>/api/plugins/seerr-notify/update \
+  -H "X-API-Key: <ADMIN_KEY>" -H 'Content-Type: application/json' \
+  -d '{"url":"https://github.com/Alsharad/openwa-seerr-notify/releases/download/v<VERSION>/seerr-notify.zip#sha256=<SHA256>"}'
+```
+
+The `#sha256=` fragment is an integrity pin. A gateway running with `PLUGIN_INSTALL_REQUIRE_PIN` (the
+default in some deployments) refuses an unpinned URL outright:
+
+> installing from a URL requires an integrity pin in this deployment: append `#sha256=<64 hex>` to the URL
+
+Every release ships `seerr-notify.zip.sha256` alongside the zip for exactly this.
 
 ### Updates
 
@@ -286,6 +311,13 @@ restart. Nothing is cached across deliveries.
   Seerr is almost never https — see *Reaching a self-hosted Seerr*. The plugin fetches exactly two kinds
   of host: the Seerr URL you configured, and `api.github.com` for the release check (which you can switch
   off). The SSRF guard still refuses private addresses unless `SSRF_ALLOWED_HOSTS` says otherwise.
+- **⚠️ The plugin can replace itself.** The Install button calls `POST /plugins/seerr-notify/update`
+  with the gateway's own admin key, which unloads the running plugin and installs a new package. The
+  chain that makes that acceptable: the download URL comes from the GitHub release feed of the repository
+  baked into the manifest **at build time** — never from config, so no config write can redirect it — and
+  it is pinned to the sha256 the release publishes beside the zip. A release with no published checksum
+  is refused. If you would rather this did not exist, delete `installUpdate` from `setup.ts`; the check
+  and the banner keep working, and `Options → Check GitHub` switches off the check entirely.
 - **⚠️ The Refresh button and the Setup tab step outside the plugin capability model.** Nothing in the
   supported surface lets a plugin write its own config: the editor is an opaque-origin sandbox with no
   network whose only channel speaks `config:get` / `config:save`, and `PluginContext.config` is a
