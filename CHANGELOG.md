@@ -6,6 +6,17 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.9.2] — 2026-08-21
+
+### Fixed
+
+- **A saved Seerr API key displayed as three characters.** The host replaces a stored secret with its
+  redaction sentinel — literally `***` — before the config reaches the panel, and the panel put that
+  straight into the field. It now leaves the field empty and says “A key is saved. Type a new one to
+  replace it.” underneath, sending the sentinel back on save so the host keeps the stored value. That
+  round trip is not cosmetic: an empty field submitted as an empty string would have erased the key the
+  panel never showed you.
+
 ## [1.9.1] — 2026-08-21
 
 ### Changed

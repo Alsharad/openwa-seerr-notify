@@ -3,3 +3,4 @@ dist/
 *.zip
 *.tgz
 .DS_Store
+seerr-notify.zip.sha256

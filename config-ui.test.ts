@@ -320,3 +320,21 @@ test('every button that waits on the plugin waits the same way', () => {
   const plugin = readFileSync(join(HERE, 'index.ts'), 'utf8');
   assert.match(plugin, /lastAction: `roster\$\{'\$'\}\{token\}`|lastAction: `roster\|\$\{token\}`/);
 });
+
+test('a saved API key is neither shown nor wiped', () => {
+  // The host replaces a stored secret with SECRET_SENTINEL ('***') before the config reaches this frame.
+  // Putting that in the field made a saved key look like a three-character one — and an empty field has
+  // to go back as the sentinel, or every save silently erases the key the panel never showed.
+  const script = html.split('<script>')[1];
+  assert.match(script, /var SECRET_SENTINEL = '\*\*\*';/, 'the sentinel must match the host');
+  assert.match(
+    script,
+    /apiKeySaved = cfg\.jellyseerrApiKey === SECRET_SENTINEL;[\s\S]*?if \(apiKeySaved\) el\('jellyseerrApiKey'\)\.value = '';/,
+    'a redacted key must leave the field empty rather than displaying the sentinel',
+  );
+  assert.match(
+    script,
+    /if \(cfg\.jellyseerrApiKey === '' && apiKeySaved\) cfg\.jellyseerrApiKey = SECRET_SENTINEL;/,
+    'an untouched key must round-trip as the sentinel, or saving wipes it',
+  );
+});

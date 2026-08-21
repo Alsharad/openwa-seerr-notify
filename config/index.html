@@ -324,8 +324,8 @@
     <div class="field">
       <label for="jellyseerrApiKey">API key</label>
       <input type="password" id="jellyseerrApiKey" name="jellyseerrApiKey" class="mono"
-             autocomplete="off" spellcheck="false" translate="no" />
-      <small>Seerr → Settings → General → API Key</small>
+             autocomplete="off" spellcheck="false" translate="no" placeholder="paste your Seerr API key…" />
+      <small id="apiKeyHint">Seerr → Settings → General → API Key</small>
     </div>
     <p class="hint">Test them with the health check on the plugin row.</p>
   </div>
@@ -501,6 +501,14 @@
   'use strict';
 
   var SCALARS = ['jellyseerrUrl', 'jellyseerrApiKey'];
+  /**
+   * What the host sends in place of a stored secret (redact-config.ts SECRET_SENTINEL). It is three
+   * asterisks, and putting it in the field made a saved key look like a three-character one. The field
+   * is left EMPTY instead, and an empty field is sent back as the sentinel — which the host reads as
+   * "keep what is stored".
+   */
+  var SECRET_SENTINEL = '***';
+  var apiKeySaved = false;
   var BOOLEANS = ['requireMappedUser', 'sendPoster', 'debug', 'updateCheckEnabled'];
 
   var el = function (id) { return document.getElementById(id); };
@@ -1024,6 +1032,12 @@
   function populateConfig(config) {
     var cfg = config || {};
     SCALARS.forEach(function (key) { el(key).value = cfg[key] === undefined || cfg[key] === null ? '' : String(cfg[key]); });
+
+    apiKeySaved = cfg.jellyseerrApiKey === SECRET_SENTINEL;
+    if (apiKeySaved) el('jellyseerrApiKey').value = '';
+    el('apiKeyHint').textContent = apiKeySaved
+      ? 'A key is saved. Type a new one to replace it.'
+      : 'Seerr → Settings → General → API Key';
     // Every switch defaults on except debug, matching the manifest's declared defaults.
     BOOLEANS.forEach(function (key) {
       var fallback = key !== 'debug';
@@ -1078,6 +1092,9 @@
   function assembleConfig() {
     var cfg = {};
     SCALARS.forEach(function (key) { cfg[key] = el(key).value.trim(); });
+    // Empty means "leave the saved key alone", which is what the sentinel tells the host. Without this a
+    // Save — or any button that saves, which is all of them — would wipe the key it never showed you.
+    if (cfg.jellyseerrApiKey === '' && apiKeySaved) cfg.jellyseerrApiKey = SECRET_SENTINEL;
     BOOLEANS.forEach(function (key) { cfg[key] = el(key).checked; });
     // Only rows the operator actually touched are persisted; an untouched, unticked account would
     // otherwise write one dead mapping row per Seerr user on every save.
