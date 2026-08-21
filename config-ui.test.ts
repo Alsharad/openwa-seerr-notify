@@ -202,7 +202,7 @@ test('the manifest can reach an operator-hosted Seerr, not only an https one', (
     net?: { allow?: string[]; allowConfigHosts?: string[] };
   };
   assert.deepEqual(manifest.net?.allow, ['*']);
-  assert.deepEqual(manifest.net?.allowConfigHosts, ['jellyseerrUrl']);
+  assert.deepEqual(manifest.net?.allowConfigHosts, ['seerrUrl']);
 });
 
 test('the re-read save cannot clobber what it is waiting for', () => {
@@ -335,7 +335,7 @@ test('the API key is shown from the mirror, and never wiped when it is not', () 
   );
   assert.match(
     script,
-    /if \(cfg\.jellyseerrApiKey === '' && apiKeySaved\) cfg\.jellyseerrApiKey = SECRET_SENTINEL;/,
+    /if \(cfg\.seerrApiKey === '' && apiKeySaved\) cfg\.seerrApiKey = SECRET_SENTINEL;/,
     'with no mirror yet, an untouched key must round-trip as the sentinel or saving wipes it',
   );
 
@@ -350,14 +350,14 @@ test('both credentials are the same control', () => {
   const markup = html.split('<script>')[0];
   const script = html.split('<script>')[1];
 
-  for (const id of ['jellyseerrUrl', 'jellyseerrApiKey', 'ingressSecret', 'webhookUrl']) {
+  for (const id of ['seerrUrl', 'seerrApiKey', 'ingressSecret', 'webhookUrl']) {
     const field = new RegExp(`<div class="rail">[\\s\\S]{0,600}?id="${id}"`);
     assert.match(markup, field, `${id} must sit in a rail like every other machine value`);
   }
   // One reveal implementation, bound twice — not two that can drift apart.
   assert.match(script, /function bindReveal\(/);
   assert.match(script, /bindReveal\('revealSecret', 'ingressSecret', 'secret'\);/);
-  assert.match(script, /bindReveal\('revealApiKey', 'jellyseerrApiKey', 'API key'\);/);
+  assert.match(script, /bindReveal\('revealApiKey', 'seerrApiKey', 'API key'\);/);
 });
 
 test('installing an update is offered only when there is one, and never unpinned', () => {

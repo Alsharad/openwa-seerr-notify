@@ -324,8 +324,8 @@
 
   <div class="card">
     <div class="rail">
-      <label class="tag" for="jellyseerrUrl">Server</label>
-      <input type="text" id="jellyseerrUrl" name="jellyseerrUrl" inputmode="url"
+      <label class="tag" for="seerrUrl">Server</label>
+      <input type="text" id="seerrUrl" name="seerrUrl" inputmode="url"
              autocomplete="off" spellcheck="false" translate="no" placeholder="http://192.168.1.50:5055…" />
       <div class="acts">
         <button type="button" class="icon" id="copyUrlSeerr" data-icon="i-copy" aria-label="Copy the server address">
@@ -335,8 +335,8 @@
     </div>
 
     <div class="rail">
-      <label class="tag" for="jellyseerrApiKey">API key</label>
-      <input type="password" id="jellyseerrApiKey" name="jellyseerrApiKey"
+      <label class="tag" for="seerrApiKey">API key</label>
+      <input type="password" id="seerrApiKey" name="seerrApiKey"
              autocomplete="off" spellcheck="false" translate="no" placeholder="paste your Seerr API key…" />
       <div class="acts">
         <button type="button" class="icon" id="revealApiKey" aria-label="Show the API key" aria-pressed="false">
@@ -529,7 +529,7 @@
 (function () {
   'use strict';
 
-  var SCALARS = ['jellyseerrUrl', 'jellyseerrApiKey'];
+  var SCALARS = ['seerrUrl', 'seerrApiKey'];
   /**
    * What the host sends in place of a stored secret (redact-config.ts SECRET_SENTINEL). It is three
    * asterisks, and putting it in the field made a saved key look like a three-character one. The field
@@ -1101,15 +1101,15 @@
     var cfg = config || {};
     SCALARS.forEach(function (key) { el(key).value = cfg[key] === undefined || cfg[key] === null ? '' : String(cfg[key]); });
 
-    // `jellyseerrApiKey` arrives redacted — the host substitutes SECRET_SENTINEL before config reaches
+    // `seerrApiKey` arrives redacted — the host substitutes SECRET_SENTINEL before config reaches
     // this frame — so the real value comes from the plugin's mirror instead, exactly like the ingress
     // secret on the Setup tab. Both credentials are then the same control with the same buttons, rather
     // than one of them being a box that shows three asterisks or nothing at all.
     var mirrored = cfg.setup && typeof cfg.setup.seerrApiKey === 'string' ? cfg.setup.seerrApiKey : '';
-    apiKeySaved = cfg.jellyseerrApiKey === SECRET_SENTINEL;
-    if (apiKeySaved) el('jellyseerrApiKey').value = mirrored;
-    el('revealApiKey').disabled = el('jellyseerrApiKey').value === '';
-    el('copyApiKey').disabled = el('jellyseerrApiKey').value === '';
+    apiKeySaved = cfg.seerrApiKey === SECRET_SENTINEL;
+    if (apiKeySaved) el('seerrApiKey').value = mirrored;
+    el('revealApiKey').disabled = el('seerrApiKey').value === '';
+    el('copyApiKey').disabled = el('seerrApiKey').value === '';
     // Every switch defaults on except debug, matching the manifest's declared defaults.
     BOOLEANS.forEach(function (key) {
       var fallback = key !== 'debug';
@@ -1167,7 +1167,7 @@
     // The field normally holds the real key (from the plugin's mirror), so it saves verbatim. The
     // fallback matters on an install whose mirror has not been written yet: there the field is empty
     // while a key IS stored, and an empty string would erase it — the sentinel says "leave it alone".
-    if (cfg.jellyseerrApiKey === '' && apiKeySaved) cfg.jellyseerrApiKey = SECRET_SENTINEL;
+    if (cfg.seerrApiKey === '' && apiKeySaved) cfg.seerrApiKey = SECRET_SENTINEL;
     BOOLEANS.forEach(function (key) { cfg[key] = el(key).checked; });
     // Only rows the operator actually touched are persisted; an untouched, unticked account would
     // otherwise write one dead mapping row per Seerr user on every save.
@@ -1299,16 +1299,16 @@
     });
   }
   bindReveal('revealSecret', 'ingressSecret', 'secret');
-  bindReveal('revealApiKey', 'jellyseerrApiKey', 'API key');
+  bindReveal('revealApiKey', 'seerrApiKey', 'API key');
 
   el('copyApiKey').addEventListener('click', function () {
-    copyText(el('jellyseerrApiKey').value, el('copyApiKey'), el('jellyseerrApiKey'));
+    copyText(el('seerrApiKey').value, el('copyApiKey'), el('seerrApiKey'));
   });
   el('copyUrlSeerr').addEventListener('click', function () {
-    copyText(el('jellyseerrUrl').value, el('copyUrlSeerr'), el('jellyseerrUrl'));
+    copyText(el('seerrUrl').value, el('copyUrlSeerr'), el('seerrUrl'));
   });
-  el('jellyseerrApiKey').addEventListener('input', function () {
-    var empty = el('jellyseerrApiKey').value === '';
+  el('seerrApiKey').addEventListener('input', function () {
+    var empty = el('seerrApiKey').value === '';
     el('revealApiKey').disabled = empty;
     el('copyApiKey').disabled = empty;
   });

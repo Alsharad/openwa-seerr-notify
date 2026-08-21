@@ -87,7 +87,7 @@ test('a non-2xx status endpoint reports the HTTP code', async () => {
 
 test('missing settings are reported without any request going out', async () => {
   const { fetch, urls } = fetcher({});
-  assert.match((await probeSeerr({ fetch, baseUrl: '', apiKey: 'k' })).message, /no Jellyseerr\/Overseerr URL/);
+  assert.match((await probeSeerr({ fetch, baseUrl: '', apiKey: 'k' })).message, /no Seerr URL/);
   assert.match((await probeSeerr({ fetch, baseUrl: 'http://x', apiKey: '' })).message, /no Seerr API key/);
   assert.deepEqual(urls, []);
 });

@@ -50,9 +50,9 @@ export interface SeerrConnection {
 }
 
 export interface SeerrConfig {
-  jellyseerr: { url: string; apiKey: string; enabled: boolean };
+  seerr: { url: string; apiKey: string; enabled: boolean };
   /** URL and key are both present. Separates "switched off" from "never filled in" in health output. */
-  jellyseerrConfigured: boolean;
+  seerrConfigured: boolean;
   requireMappedUser: boolean;
   users: SeerrUser[];
   /** Cached Seerr accounts, refreshed by the Recipients tab or refresh-roster.mjs. */
@@ -147,8 +147,11 @@ function readUsers(raw: unknown, roster: Map<number, RosterEntry>): SeerrUser[] 
  * whose enrichment call fails still goes out from the payload alone; that is a degraded call, not a mode.
  */
 export function readSeerrConnection(raw: Record<string, unknown>): SeerrConnection {
-  const url = str(raw.jellyseerrUrl).replace(/\/+$/, '');
-  const apiKey = str(raw.jellyseerrApiKey);
+  // `jellyseerr*` are the pre-1.13 spellings. They are still read so an install that has not been
+  // migrated keeps working on the version that renames them; index.ts moves the values across once and
+  // blanks the old keys, after which this fallback never fires again.
+  const url = (str(raw.seerrUrl) || str(raw.jellyseerrUrl)).replace(/\/+$/, '');
+  const apiKey = str(raw.seerrApiKey) || str(raw.jellyseerrApiKey);
   return {
     url,
     apiKey,
@@ -173,8 +176,8 @@ export function readConfig(raw: Record<string, unknown>): SeerrConfig {
   const seerr = readSeerrConnection(raw);
 
   return {
-    jellyseerr: { url: seerr.url, apiKey: seerr.apiKey, enabled: seerr.enabled },
-    jellyseerrConfigured: seerr.configured,
+    seerr: { url: seerr.url, apiKey: seerr.apiKey, enabled: seerr.enabled },
+    seerrConfigured: seerr.configured,
     requireMappedUser: bool(raw.requireMappedUser, true),
     users,
     roster,

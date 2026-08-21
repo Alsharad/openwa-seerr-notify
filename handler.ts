@@ -57,9 +57,9 @@ function deadLetterDeps(deps: HandlerDeps): DeadLetterDeps {
 export async function processEvent(deps: HandlerDeps, event: NormalizedEvent, req: WebhookRequest, sessionId: string): Promise<void> {
   const cfg = deps.config;
 
-  if (cfg.jellyseerr.enabled) {
+  if (cfg.seerr.enabled) {
     await enrich(
-      { fetch: deps.net, baseUrl: cfg.jellyseerr.url, apiKey: cfg.jellyseerr.apiKey, log: deps.log },
+      { fetch: deps.net, baseUrl: cfg.seerr.url, apiKey: cfg.seerr.apiKey, log: deps.log },
       event,
     );
   }

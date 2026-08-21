@@ -112,7 +112,7 @@ test('enrichment is skipped entirely when it is not configured', async () => {
 
 test('a Seerr API failure degrades the message instead of dropping the delivery', async () => {
   // netBody undefined ⇒ every enrichment call answers 502.
-  const config = baseConfig({ jellyseerrUrl: 'http://seerr:5055', jellyseerrApiKey: 'k' });
+  const config = baseConfig({ seerrUrl: 'http://seerr:5055', seerrApiKey: 'k' });
   const { deps, sent, fetched } = harness(config);
   await processEvent(deps, normalizePayload(availablePayload), request(availablePayload), 'sess');
 

@@ -22,6 +22,28 @@ All notable changes to this plugin are documented here. The format follows
 - Removed the instruction to reload the page after Refresh from Seerr; the list has repainted in place
   since 1.9.0. Host placeholders read `<openwa-host>:<openwa-port>` everywhere, matching the panel.
 
+## [1.13.0] — 2026-08-21
+
+### Changed
+
+- **It is called Seerr everywhere now.** “Overseerr/Jellyseerr” is gone from the panel, the manifest, the
+  health messages and the docs — the two share a webhook payload and an API, and naming both every time
+  said nothing the reader needed. The README states once, up front, that Seerr means either flavour.
+- **The config keys are renamed to match**: `jellyseerrUrl` → `seerrUrl`, `jellyseerrApiKey` →
+  `seerrApiKey`. Leaving the API spelling at `jellyseerr*` while the interface said Seerr was exactly the
+  kind of split this rename exists to remove.
+
+  **Nothing to do on upgrade.** Both spellings are read, so an install keeps working the moment the new
+  version starts; the first background pass moves the values across and blanks the old pair. Only a
+  script or backup that writes `jellyseerrUrl` / `jellyseerrApiKey` directly needs updating — those keys
+  are still read, but they are no longer where the value lives.
+
+  `net.allowConfigHosts` follows the rename, so a Seerr URL keeps being auto-admitted.
+
+- The `overseerr` and `jellyseerr` **keywords are deliberately kept** in `manifest.json` and
+  `package.json`. They are search terms, not prose: dropping them would make the plugin undiscoverable to
+  someone looking for the product they actually run.
+
 ## [1.12.0] — 2026-08-21
 
 ### Changed

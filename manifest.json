@@ -1,10 +1,10 @@
 {
   "id": "seerr-notify",
   "name": "Seerr Notifications",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "type": "extension",
   "main": "dist/index.js",
-  "description": "Deliver Overseerr/Jellyseerr request and issue notifications over WhatsApp, formatted per recipient.",
+  "description": "Deliver Seerr request and issue notifications over WhatsApp, formatted per recipient.",
   "author": "gunslingerkw",
   "license": "MIT",
   "homepage": "https://github.com/Alsharad/openwa-seerr-notify",
@@ -38,7 +38,7 @@
       "*"
     ],
     "allowConfigHosts": [
-      "jellyseerrUrl"
+      "seerrUrl"
     ]
   },
   "ingress": [
@@ -75,13 +75,13 @@
   "configSchema": {
     "type": "object",
     "properties": {
-      "jellyseerrUrl": {
+      "seerrUrl": {
         "type": "string",
-        "title": "Jellyseerr / Overseerr URL",
-        "description": "Required. Base URL of your Overseerr/Jellyseerr server, e.g. http://192.168.1.50:5055.",
+        "title": "Seerr URL",
+        "description": "Required. Base URL of your Seerr server, e.g. http://192.168.1.50:5055.",
         "default": ""
       },
-      "jellyseerrApiKey": {
+      "seerrApiKey": {
         "type": "string",
         "title": "Seerr API key",
         "description": "Required. Used to read the user list and to fill notifications out with media detail.",

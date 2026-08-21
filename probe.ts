@@ -49,7 +49,7 @@ async function get(deps: ProbeDeps, path: string, withKey: boolean): Promise<Plu
  * Never throws — every outcome is a message the operator can act on.
  */
 export async function probeSeerr(deps: ProbeDeps): Promise<ProbeResult> {
-  if (!deps.baseUrl) return { ok: false, message: 'no Jellyseerr/Overseerr URL configured' };
+  if (!deps.baseUrl) return { ok: false, message: 'no Seerr URL configured' };
   if (!deps.apiKey) return { ok: false, message: 'no Seerr API key configured' };
 
   // `checkUpdateAvailable=false` keeps /status from calling out to GitHub for an update check, which

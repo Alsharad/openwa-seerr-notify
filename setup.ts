@@ -50,7 +50,7 @@ export interface SetupState {
   /**
    * The Seerr API key, mirrored so the Connection tab can show it.
    *
-   * The host redacts `jellyseerrApiKey` to '***' before config reaches the config UI, so the panel could
+   * The host redacts `seerrApiKey` to '***' before config reaches the config UI, so the panel could
    * never display the stored one — which is why it first rendered as three characters and then as an
    * empty box. The plugin does have it. Mirroring it here is the same trade already made for the ingress
    * secret above: readable to an admin API key, in exchange for a credential field the operator can

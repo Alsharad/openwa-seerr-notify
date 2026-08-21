@@ -1,12 +1,16 @@
 # Seerr Notifications → WhatsApp
 
-> Deliver Overseerr/Jellyseerr request and issue notifications over WhatsApp. Seerr's webhook is verified
+> Deliver Seerr request and issue notifications over WhatsApp. Seerr's webhook is verified
 > host-side against a shared secret, enriched from the Seerr API, routed to the right people from a user
 > mapping, and formatted per recipient — with an extra Admin Info block for administrators.
 
 ![type: extension](https://img.shields.io/badge/type-extension-blue.svg)
 ![license: MIT](https://img.shields.io/badge/license-MIT-green.svg)
 ![built for OpenWA](https://img.shields.io/badge/OpenWA-%E2%89%A5%200.8.16-25D366.svg)
+
+**Seerr** here means either flavour — [Overseerr](https://overseerr.dev) or
+[Jellyseerr](https://github.com/fallenbagel/jellyseerr). They share the webhook payload and the API this
+plugin uses, so everything below applies to both, and the panel says Seerr throughout.
 
 An [OpenWA](https://github.com/rmyndharis/OpenWA) plugin. Built against the conventions in that
 project's [plugin standard](https://github.com/rmyndharis/OpenWA-plugins/blob/main/PLUGIN-STANDARD.md).
@@ -15,7 +19,7 @@ project's [plugin standard](https://github.com/rmyndharis/OpenWA-plugins/blob/ma
 | --- | --- |
 | **Plugin id** | `seerr-notify` |
 | **Requires** | OpenWA ≥ 0.8.16 (Integration SDK v1) · tested 0.23.1 |
-| **Tested against** | Jellyseerr / Seerr 3.4.1 |
+| **Tested against** | Seerr 3.4.1 |
 | **Permissions** | `webhook:ingress` · `conversation:send` · `net:fetch` · `storage:use` |
 | **Ingress route** | `seerr` — shared-secret in the `Authorization` header |
 
@@ -79,7 +83,7 @@ webhook URL read back from the gateway, generates the header secret, and spells 
 The full path:
 
 1. **Have a WhatsApp session running** in OpenWA, and note its session id.
-2. **Create a Seerr API key** (Jellyseerr/Overseerr → Settings → General → API Key). It is required:
+2. **Create a Seerr API key** (Seerr → Settings → General → API Key). It is required:
    the recipient list is read from Seerr, so a Seerr account is the only thing that can be mapped to a
    WhatsApp number.
 3. **Install and enable the plugin** (below). It enables with an empty config — there is nothing to
@@ -103,7 +107,7 @@ The full path:
    from step 4, press **Generate a new secret** (twice — it asks) and copy the value that appears a
    second later — masked by default, with reveal, copy and regenerate icons, the same way Seerr shows
    its own API key.
-7. **Point Seerr at it** — Jellyseerr/Overseerr → Settings → Notifications → Webhook:
+7. **Point Seerr at it** — Seerr → Settings → Notifications → Webhook:
    - **Enable Agent**: on
    - **Webhook URL**: the URL from the Setup tab
    - **Authorization Header**: the secret. Seerr sends this field verbatim, with no scheme, which is
@@ -231,8 +235,8 @@ are listed because they are what the REST API and any backup will show you.
 | Key | Required | Default | Description |
 | --- | -------- | ------- | ----------- |
 | `users` | **yes** | `[]` | Recipient mappings, one per notified Seerr account: `{ seerrUserId, number, enabled }`. Identity and admin status come from `seerrRoster`, not from here; an account Seerr does not have cannot be added. Untick someone to stop notifying them. Nothing is delivered while none is enabled with a number. |
-| `jellyseerrUrl` | **yes** | `""` | Seerr base URL. See *Reaching a self-hosted Seerr*. |
-| `jellyseerrApiKey` | **yes** | `""` | Seerr API key. Reads the user list, and fills notifications out. Redacted to `***` on every read, so the panel shows an empty field with “A key is saved” rather than the sentinel; leaving it empty keeps the stored key. |
+| `seerrUrl` | **yes** | `""` | Seerr base URL. See *Reaching a self-hosted Seerr*. |
+| `seerrApiKey` | **yes** | `""` | Seerr API key. Reads the user list, and fills notifications out. Redacted to `***` on every read, so the panel shows an empty field with “A key is saved” rather than the sentinel; leaving it empty keeps the stored key. |
 | `requireMappedUser` | no | `true` | On: an event whose requester or reporter matches no enabled recipient is written to the plugin's dead-letter buffer, and the health check reports the count and the most recent reason. Off: dropped without a trace. Shown in the panel as **Flag notifications with no recipient**. |
 | `sendPoster` | no | `true` | Attach the poster to `MEDIA_AVAILABLE` / `MEDIA_PENDING`. Sent as the image caption when the whole message fits WhatsApp's 1024-character caption limit, otherwise as an uncaptioned image followed by the text. |
 | `routing` | no | *(defaults)* | Per-event delivery rules — `{ EVENT: { user, admin, adminInfo } }`. Edited in **Who gets what**; unset events use the shipped defaults. `adminInfo` appends a block to the admin copy carrying the requester or reporter's name and email and the Seerr request/issue id. Someone who is both the requester and an admin gets one message — the admin one. |
@@ -288,7 +292,7 @@ it. This table is where the detail lives.
 - **The Refresh button needs the gateway's key file.** It reads `/app/data/.api-key` to write the roster
   back through OpenWA's own API — see **Security**. Where that file is unreadable, use
   `refresh-roster.mjs` instead, which takes the key from the environment.
-- **Verified against Jellyseerr/Seerr 3.4.1.** Notably, that build validates `/api/v1/status` query
+- **Verified against Seerr 3.4.1.** Notably, that build validates `/api/v1/status` query
   params against its OpenAPI schema, so the plugin sends `checkUpdateAvailable=false` (an empty value or
   `0` is rejected with a 400). Older Seerr builds coerce the value instead and simply run the update
   check, which is slower but not an error.

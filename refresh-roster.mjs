@@ -17,7 +17,7 @@
 //   OPENWA_URL      default http://localhost:2785
 //   OPENWA_API_KEY  default: read from OPENWA_API_KEY_FILE
 //   OPENWA_API_KEY_FILE  default /app/data/.api-key (host path outside Docker, e.g. <appdata>/openwa/.api-key)
-//   SEERR_URL       default: taken from the plugin's own jellyseerrUrl config
+//   SEERR_URL       default: taken from the plugin's own seerrUrl config
 //   PLUGIN_ID       default seerr-notify
 //   DRY_RUN=1       fetch and print the roster, write nothing
 
@@ -79,8 +79,8 @@ if (!seerrApiKey) die('SEERR_API_KEY is required (the key in plugin config reads
 
 const plugin = await api(`/api/plugins/${PLUGIN_ID}`);
 const config = plugin.config ?? {};
-const seerrUrl = (process.env.SEERR_URL ?? config.jellyseerrUrl ?? '').replace(/\/+$/, '');
-if (!seerrUrl) die('no Seerr URL: set SEERR_URL, or configure jellyseerrUrl on the plugin first');
+const seerrUrl = (process.env.SEERR_URL ?? config.seerrUrl ?? '').replace(/\/+$/, '');
+if (!seerrUrl) die('no Seerr URL: set SEERR_URL, or configure seerrUrl on the plugin first');
 
 const records = await fetchSeerrUsers(seerrUrl, seerrApiKey);
 const roster = records

@@ -45,12 +45,12 @@ test('every Now Available section is on, and no config can switch one off', () =
 });
 
 test('enrichment stays off unless the toggle, the URL and the API key are all present', () => {
-  assert.equal(readConfig(withUser()).jellyseerr.enabled, false);
-  assert.equal(readConfig(withUser({ jellyseerrUrl: 'http://seerr:5055' })).jellyseerr.enabled, false);
-  const full = readConfig(withUser({ jellyseerrUrl: 'http://seerr:5055/', jellyseerrApiKey: 'k' }));
-  assert.equal(full.jellyseerr.enabled, true);
+  assert.equal(readConfig(withUser()).seerr.enabled, false);
+  assert.equal(readConfig(withUser({ seerrUrl: 'http://seerr:5055' })).seerr.enabled, false);
+  const full = readConfig(withUser({ seerrUrl: 'http://seerr:5055/', seerrApiKey: 'k' }));
+  assert.equal(full.seerr.enabled, true);
   // Trailing slash stripped so path concatenation cannot produce a double slash.
-  assert.equal(full.jellyseerr.url, 'http://seerr:5055');
+  assert.equal(full.seerr.url, 'http://seerr:5055');
 });
 
 test('nested user defaults are applied in code, since the host seeds only top-level defaults', () => {

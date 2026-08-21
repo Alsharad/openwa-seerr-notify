@@ -176,6 +176,9 @@ export default class SeerrNotifyPlugin implements IPlugin {
       const config = ctx.config as Record<string, unknown>;
       // Before the pass, so an install or a restart brings the mirror up to date even if the operator
       // has never touched the config since the key was set.
+      await this.migrateSeerrKeys(ctx).catch((err) =>
+        ctx.logger.warn(`seerr-notify: could not migrate the Seerr config keys — ${String(err)}`),
+      );
       await this.mirrorSeerrKey(ctx).catch(() => undefined);
       const state = await refreshSetupInBackground(this.setupDeps(ctx), readSetup(config.setup), {
         checkUpdates: config.updateCheckEnabled !== false,
@@ -218,14 +221,38 @@ export default class SeerrNotifyPlugin implements IPlugin {
    * Keep `setup.seerrApiKey` equal to the stored Seerr key.
    *
    * This is the only reason the Connection tab can show the key at all: the host redacts
-   * `jellyseerrApiKey` to '***' before config reaches the config UI, so the panel never receives it.
+   * `seerrApiKey` to '***' before config reaches the config UI, so the panel never receives it.
    *
    * It writes only when the two differ, which is what stops it looping — the write it triggers comes
    * back through onConfigChange, finds them equal, and does nothing.
    */
+  /**
+   * Move a pre-1.13 config off `jellyseerrUrl` / `jellyseerrApiKey` and onto `seerrUrl` / `seerrApiKey`.
+   *
+   * `readSeerrConnection` reads either spelling, so nothing breaks before this runs — this is what stops
+   * the old pair lingering in stored config for ever, holding a stale copy of the API key. It writes at
+   * most once: afterwards the old keys are empty and the guard below returns.
+   */
+  private async migrateSeerrKeys(ctx: PluginContext): Promise<void> {
+    const config = ctx.config as Record<string, unknown>;
+    const oldUrl = typeof config.jellyseerrUrl === 'string' ? config.jellyseerrUrl : '';
+    const oldKey = typeof config.jellyseerrApiKey === 'string' ? config.jellyseerrApiKey : '';
+    if (!oldUrl && !oldKey) return;
+
+    const newUrl = typeof config.seerrUrl === 'string' ? config.seerrUrl : '';
+    const newKey = typeof config.seerrApiKey === 'string' ? config.seerrApiKey : '';
+    await writePluginConfig(this.setupDeps(ctx), {
+      seerrUrl: newUrl || oldUrl,
+      seerrApiKey: newKey || oldKey,
+      jellyseerrUrl: '',
+      jellyseerrApiKey: '',
+    });
+    ctx.logger.log('seerr-notify: moved the Seerr connection onto seerrUrl / seerrApiKey');
+  }
+
   private async mirrorSeerrKey(ctx: PluginContext): Promise<void> {
     const config = ctx.config as Record<string, unknown>;
-    const stored = typeof config.jellyseerrApiKey === 'string' ? config.jellyseerrApiKey : '';
+    const stored = typeof config.seerrApiKey === 'string' ? config.seerrApiKey : '';
     const previous = readSetup(config.setup);
     if (previous.seerrApiKey === stored) return;
 
@@ -268,10 +295,10 @@ export default class SeerrNotifyPlugin implements IPlugin {
       // every subsequent config change. The operator can always click the button again.
       await ctx.storage.set(LAST_REFRESH_KEY, token).catch(() => undefined);
 
-      const url = String(newConfig.jellyseerrUrl ?? '').trim().replace(/\/+$/, '');
       // Read from ctx.config, not newConfig: the dashboard sends secrets back masked ('***'), and the
-      // host restores the real value into ctx.config before this fires.
-      const apiKey = String((ctx.config as Record<string, unknown>).jellyseerrApiKey ?? '').trim();
+      // host restores the real value into ctx.config before this fires. readSeerrConnection also handles
+      // the pre-1.13 key names, so a refresh works on a config the migration has not reached yet.
+      const { url, apiKey } = readSeerrConnection(ctx.config);
 
       const result = await refreshRoster(
         {

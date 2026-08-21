@@ -365,3 +365,29 @@ test('the marker survives until the version it names is the one running', async 
   const arrived = await refreshSetupInBackground(deps, { ...midInstall, upgradingTo: '1.6.0' }, { checkUpdates: false, intervalMs: 1 });
   assert.equal(arrived?.upgradingTo, '', 'the version that was asked for is now running, so the install is done');
 });
+
+test('the pre-1.13 config key names still resolve', async () => {
+  // `jellyseerrUrl` / `jellyseerrApiKey` were renamed to `seerrUrl` / `seerrApiKey`. Reading both is what
+  // keeps an install working between the version that renames them and the pass that migrates it — a
+  // rename that silently disconnects everyone's Seerr server is not a rename, it is an outage.
+  const { readSeerrConnection } = await import('./config.ts');
+
+  const old = readSeerrConnection({ jellyseerrUrl: 'http://seerr:5055/', jellyseerrApiKey: 'k' });
+  assert.equal(old.url, 'http://seerr:5055');
+  assert.equal(old.apiKey, 'k');
+  assert.equal(old.enabled, true);
+
+  const migrated = readSeerrConnection({ seerrUrl: 'http://new:5055', seerrApiKey: 'n' });
+  assert.equal(migrated.url, 'http://new:5055');
+  assert.equal(migrated.apiKey, 'n');
+
+  // Mid-migration both are present; the new spelling is the one that counts.
+  const both = readSeerrConnection({
+    seerrUrl: 'http://new:5055',
+    seerrApiKey: 'n',
+    jellyseerrUrl: 'http://old:5055',
+    jellyseerrApiKey: 'o',
+  });
+  assert.equal(both.url, 'http://new:5055');
+  assert.equal(both.apiKey, 'n');
+});
