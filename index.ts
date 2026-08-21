@@ -340,10 +340,14 @@ export default class SeerrNotifyPlugin implements IPlugin {
    * Doubles as the "test my Seerr settings" button: the dashboard's health-check action calls
    * `GET /api/plugins/seerr-notify/health` and shows `message` in a toast.
    *
-   * The verdict tracks the CONFIGURATION, not the delivery history. A bad URL or a rejected API key is
-   * something the operator must fix, so it reports unhealthy. Dead letters are appended as context but
-   * never flip the verdict — one failed send is not a broken plugin, and a health badge that flaps on
-   * every hiccup stops being a signal.
+   * **The verdict is the Seerr connection.** That is the one thing here an operator cannot check by
+   * looking: a wrong address or a rejected key produces no visible symptom until a notification silently
+   * arrives bare, so it is worth a red badge. Everything else is appended as context and never flips it.
+   *
+   * In particular an empty recipient list does not. It is an unfinished setup rather than a fault — the
+   * normal state of a fresh install — and it is already obvious on the Recipients tab, which counts how
+   * many people will be notified. Failing the check for it makes a fresh install look broken and teaches
+   * the operator to ignore the badge, which is the same reason a dead letter has never flipped it.
    */
   async healthCheck(): Promise<{ healthy: boolean; message?: string }> {
     if (!this.ctx) return { healthy: true, message: 'Not enabled.' };
@@ -376,8 +380,8 @@ export default class SeerrNotifyPlugin implements IPlugin {
     try {
       readConfig(ctx.config);
     } catch (err) {
-      // readConfig throws only when the plugin could not deliver anything at all (no user mapping).
-      healthy = false;
+      // readConfig throws only when nothing could be delivered at all — no mapped recipient. Worth
+      // saying, not worth failing on: see the note above the method.
       notes.push(err instanceof Error ? err.message : String(err));
     }
 

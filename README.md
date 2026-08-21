@@ -64,6 +64,12 @@ Deliveries that cannot be completed are recorded in a bounded buffer in plugin s
 50 entries) with reason `invalid_payload`, `no_recipients`, `no_session` or `send_failed`. `healthCheck`
 reports the count and the most recent entry.
 
+**What the health badge means.** The verdict is the Seerr connection, and nothing else. That is the one
+thing an operator cannot check by looking: a wrong address or a rejected key produces no visible symptom
+until a notification quietly arrives bare. Everything else the check knows — an empty recipient list,
+recent delivery failures — is reported in the message but never flips the verdict. An unfinished setup is
+not a fault, and a badge that goes red for one teaches you to ignore it.
+
 ### Why the work is backgrounded
 
 The host dispatches an ingress handler with a **5 second** budget and does **not** cancel the work when

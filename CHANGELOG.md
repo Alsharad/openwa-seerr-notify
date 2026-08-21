@@ -22,6 +22,26 @@ All notable changes to this plugin are documented here. The format follows
 - Removed the instruction to reload the page after Refresh from Seerr; the list has repainted in place
   since 1.9.0. Host placeholders read `<openwa-host>:<openwa-port>` everywhere, matching the panel.
 
+## [1.15.0] — 2026-08-21
+
+### Changed
+
+- **The health verdict is the Seerr connection, and nothing else.** A fresh install with a working Seerr
+  and no recipients mapped yet reported *Health Check Failed*, which is wrong twice over: an unfinished
+  setup is not a fault, and it is the normal state of every new install. It is also already obvious on
+  the Recipients tab, which counts how many people will be notified — it does not need a health check to
+  discover.
+
+  The connection is what an operator genuinely cannot check by looking: a wrong address or a rejected key
+  produces no visible symptom until a notification quietly arrives bare. So that decides the badge, and
+  an empty recipient list joins dead letters as something the message reports without flipping it — the
+  policy dead letters have had since 1.0.0 and that this had been contradicting.
+
+  The message is unchanged: *“Seerr v3.4.1 No recipients yet — tick someone on the Recipients tab and add
+  their WhatsApp number.”* Only the verdict is.
+
+- Added `health.test.ts` covering the policy in both directions, since it has now moved twice.
+
 ## [1.14.1] — 2026-08-21
 
 ### Fixed
