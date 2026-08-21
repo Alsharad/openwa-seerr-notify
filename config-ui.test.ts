@@ -206,15 +206,19 @@ test('the manifest can reach an operator-hosted Seerr, not only an https one', (
 });
 
 test('the re-read save cannot clobber what it is waiting for', () => {
-  // After a Setup action the editor re-saves purely to make the dashboard re-read config — that is the
-  // only lever it has, since the host answers config:get from the plugin list the page already holds.
-  // Config writes merge shallowly host-side, so stripping these two keys is what leaves the plugin's
-  // fresh write intact. Send the editor's stale copy back instead and the answer is overwritten by the
-  // question, and the value never appears at all.
+  // After an action the editor re-saves purely to make the dashboard re-read config — that is the only
+  // lever it has, since the host answers config:get from the plugin list the page already holds. The
+  // patch must be EMPTY: config writes merge shallowly, so an empty one changes nothing while still
+  // triggering the re-read.
+  //
+  // It used to send the whole form minus `setup`, and the stale copy overwrote what the plugin had just
+  // written — a roster refresh fetched 25 accounts and the probe put the editor's empty list back over
+  // them, so the panel reported success with an empty list. A strip-list is what failed; there is now
+  // nothing to keep in step.
   const body = /function waitForSetupResult\(\) \{([\s\S]*?)\n  \}/.exec(html);
   assert.ok(body, 'could not find waitForSetupResult in the editor');
-  assert.match(body[1], /delete cfg\.setup;/, 'the re-read save would overwrite the plugin write-back');
-  assert.match(body[1], /delete cfg\.setupRequestedAt;/, 'the re-read save would replay a spent token');
+  assert.match(body[1], /config: \{\}/, 'the re-read probe must carry no config at all');
+  assert.doesNotMatch(body[1], /assembleConfig\(\)/, 'sending the form back is what overwrote the plugin write');
 });
 
 test('the Setup tab is the last tab, and not the one the editor opens on', () => {
@@ -422,4 +426,14 @@ test('a plugin that is not enabled is named as the cause, not reported as a hang
   assert.match(script, /var neverRan = !setup\.version;/);
   assert.match(script, /is the plugin enabled\? Enable it on the plugin card/);
   assert.match(script, /'Not running yet — enable the plugin on its card'/);
+});
+
+test('saving is never gated or answered as a failure', () => {
+  // Saving the Options tab used to reply in red about recipients — another tab's business, dressed as a
+  // failure, after a save that had succeeded. Nothing in this panel refuses to save, and nothing reports
+  // a successful save as a problem.
+  const handler = /saveBtn\.addEventListener\('click'[\s\S]*?\n  \}\);/.exec(html);
+  assert.ok(handler, 'could not find the save handler');
+  assert.doesNotMatch(handler[0], /return;/, 'the save must have no early exit');
+  assert.doesNotMatch(handler[0], /setStatus\([^)]*, false\)/, 'a completed save must not answer in red');
 });

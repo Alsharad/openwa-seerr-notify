@@ -1088,10 +1088,13 @@
     setTimeout(function () {
       if (!pending) return;
       pending.phase = 'reread';
-      var cfg = assembleConfig();
-      delete cfg.setup;
-      delete cfg.setupRequestedAt;
-      parent.postMessage({ type: 'config:save', config: cfg }, '*');
+      // An EMPTY patch. Config writes merge shallowly host-side, so this changes nothing at all while
+      // still making the dashboard re-read — which is the entire job. It used to send the whole form
+      // minus `setup`, and that stale copy overwrote whatever the plugin had just written: a roster
+      // refresh fetched 25 accounts and this put the editor's empty list straight back over them, so the
+      // panel reported success with nothing in the list. Naming keys to strip is how that happened;
+      // sending none cannot go wrong again.
+      parent.postMessage({ type: 'config:save', config: {} }, '*');
     }, wait);
   }
 
@@ -1277,16 +1280,13 @@
   });
 
   saveBtn.addEventListener('click', function () {
+    // No preconditions. Saving the Options tab used to answer in red about recipients — a different tab's
+    // business, dressed as a failure, after a save that had in fact succeeded. The Recipients tab counts
+    // who will be notified and the health check says the same; neither needs repeating here.
     var cfg = assembleConfig();
-    var live = cfg.users.filter(function (m) { return m.enabled && m.number !== ''; });
     saveBtn.disabled = true;
     setStatus('Saving…', true);
     parent.postMessage({ type: 'config:save', config: cfg }, '*');
-    // Saved either way — a first-run operator has to save a Seerr URL before a roster refresh can find
-    // anyone to map, so this warns about what will not be delivered yet rather than refusing.
-    if (live.length === 0) {
-      setStatus('Saved. Tick a recipient and add their number to start delivering.', false);
-    }
   });
 
   el('userFilter').addEventListener('input', applyFilter);

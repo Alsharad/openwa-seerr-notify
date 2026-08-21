@@ -22,6 +22,26 @@ All notable changes to this plugin are documented here. The format follows
 - Removed the instruction to reload the page after Refresh from Seerr; the list has repainted in place
   since 1.9.0. Host placeholders read `<openwa-host>:<openwa-port>` everywhere, matching the panel.
 
+## [1.15.1] — 2026-08-21
+
+### Fixed
+
+- **“Recipient list updated” with an empty list.** The refresh worked every time — the gateway log shows
+  `roster refreshed: 25 Seerr account(s)` — and then the panel overwrote it. After an action the editor
+  re-saves to force the dashboard to re-read config, and that save carried the whole form minus `setup`;
+  the editor's roster was still the empty one it had loaded, so it landed straight back on top of the 25
+  accounts the plugin had just written.
+
+  The probe now sends `{}`. Shallow merge means an empty patch changes nothing while still triggering the
+  re-read, which was the entire job. Naming keys to strip is what failed here — `setup` was stripped and
+  `seerrRoster` was not — so there is no longer a list to keep in step.
+
+- **Saving no longer answers in red about recipients.** Saving the Options tab replied “Saved. Tick a
+  recipient and add their number” in the failure colour — another tab's business, reported as a problem,
+  after a save that had in fact succeeded. Nothing in this panel gates a save, and nothing calls a
+  completed one a failure. The Recipients tab counts who will be notified; the health check says the
+  same. Neither needed repeating on a Save.
+
 ## [1.15.0] — 2026-08-21
 
 ### Changed
