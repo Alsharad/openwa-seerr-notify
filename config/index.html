@@ -5,177 +5,306 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Seerr Notifications</title>
 <style>
-  /* Colour lives in custom properties so the dark theme is a variable swap rather than a second
-     stylesheet. The host resolves its theme and sends it with the config handshake
-     (config:value.theme) because this editor runs in an opaque-origin sandbox and cannot read the
-     dashboard's theme itself. Falls back to the OS preference when the host says nothing. */
+  /* ── Tokens ────────────────────────────────────────────────────────────────
+     This panel renders inside OpenWA’s dashboard, in a sandboxed iframe the host
+     themes for us (config:value.theme — the frame has an opaque origin and cannot
+     read the dashboard’s theme itself). So the palette follows the host rather
+     than asserting one of its own, and falls back to the OS preference when the
+     host says nothing.
+
+     --sunk is the one token that is not the host’s: the recessed field colour
+     that gives every value row its inset look. */
   :root {
-    --bg: #ffffff;
-    --fg: #1f2937;
-    --muted: #6b7280;
-    --border: #d1d5db;
-    --panel: #f9fafb;
+    color-scheme: light;
+    --ink: #111827;
+    --ink-dim: #6b7280;
+    --edge: #d8dce3;
+    --page: #ffffff;
+    --panel: #f7f8fa;
+    --sunk: #eef0f4;
     --accent: #16a34a;
-    --accent-fg: #ffffff;
+    --accent-ink: #ffffff;
+    --accent-soft: rgba(22, 163, 74, .12);
     --danger: #dc2626;
-    --ok: #15803d;
+    --danger-soft: rgba(220, 38, 38, .1);
+    --radius: 10px;
+    --radius-sm: 7px;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #1e293b; --fg: #e2e8f0; --muted: #94a3b8; --border: #334155;
-      --panel: #0f172a; --accent: #22c55e; --accent-fg: #052e16; --danger: #f87171; --ok: #4ade80;
+      color-scheme: dark;
+      --ink: #e6edf5; --ink-dim: #93a1b5; --edge: #2f3b4d;
+      --page: #1e293b; --panel: #172033; --sunk: #101a2c;
+      --accent: #22c55e; --accent-ink: #052e16; --accent-soft: rgba(34, 197, 94, .16);
+      --danger: #f87171; --danger-soft: rgba(248, 113, 113, .14);
     }
   }
   :root[data-theme="dark"] {
-    --bg: #1e293b; --fg: #e2e8f0; --muted: #94a3b8; --border: #334155;
-    --panel: #0f172a; --accent: #22c55e; --accent-fg: #052e16; --danger: #f87171; --ok: #4ade80;
+    color-scheme: dark;
+    --ink: #e6edf5; --ink-dim: #93a1b5; --edge: #2f3b4d;
+    --page: #1e293b; --panel: #172033; --sunk: #101a2c;
+    --accent: #22c55e; --accent-ink: #052e16; --accent-soft: rgba(34, 197, 94, .16);
+    --danger: #f87171; --danger-soft: rgba(248, 113, 113, .14);
   }
 
   * { box-sizing: border-box; }
   body {
-    margin: 0; padding: 16px;
-    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg); color: var(--fg);
+    margin: 0 auto; padding: 14px 16px 18px; max-width: 760px;
+    font: 13px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--page); color: var(--ink);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    overflow-x: hidden;
   }
-  h2 { font-size: 15px; margin: 0 0 4px; }
-  p.hint { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
 
-  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap; }
+  /* Every machine value — URL, secret, event name, Seerr id, phone number — is set in mono with
+     tabular figures, so ids and numbers line up column-wise wherever they appear. */
+  code, .mono, .rail input, .rail .value {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+  }
+
+  h1, h2, h3 { text-wrap: balance; }
+  h2 { font-size: 15px; margin: 0 0 3px; letter-spacing: -.01em; }
+  h3 { font-size: 12px; margin: 0; font-weight: 600; }
+  .lede { color: var(--ink-dim); font-size: 12px; margin: 0 0 14px; }
+  .hint { color: var(--ink-dim); font-size: 12px; margin: 0; }
+
+  /* ── Tabs ─────────────────────────────────────────────────────────────── */
+  .tabs {
+    display: flex; gap: 2px; margin-bottom: 14px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--edge);
+  }
   .tabs button {
-    background: none; border: none; border-bottom: 2px solid transparent;
-    color: var(--muted); font: inherit; padding: 8px 12px; cursor: pointer;
+    background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    color: var(--ink-dim); font: inherit; font-size: 13px; padding: 7px 11px; cursor: pointer;
+    transition: color .12s ease, border-color .12s ease;
   }
-  .tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
+  .tabs button:hover { color: var(--ink); }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
   section[hidden] { display: none; }
+  section:focus:not(:focus-visible) { outline: none; }
 
-  label { display: block; font-weight: 600; margin-bottom: 4px; }
-  .field { margin-bottom: 16px; }
-  .field small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
-  input[type="text"], input[type="password"], input[type="number"] {
-    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--panel); color: var(--fg); font: inherit;
+  /* ── Card: the only sectioning device, on every tab ───────────────────── */
+  .card {
+    border: 1px solid var(--edge); border-radius: var(--radius); background: var(--panel);
+    padding: 13px 14px; margin-bottom: 10px;
   }
-  .check { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 14px; }
-  .check input { margin-top: 3px; }
-  .check label { font-weight: 600; margin: 0; }
-
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
-  td.mark, th.mark { text-align: center; width: 90px; }
-  .yes { color: var(--ok); font-weight: 700; }
-  .no { color: var(--muted); }
-  td.mark.toggle { cursor: pointer; user-select: none; }
-  td.mark.toggle:hover { background: var(--panel); }
-  td.mark.na { color: var(--border); cursor: default; }
-  button.linkish {
-    background: none; border: none; padding: 0; font: inherit; font-size: 12px;
-    color: var(--accent); text-decoration: underline; cursor: pointer;
+  .card > :last-child { margin-bottom: 0; }
+  .card-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-bottom: 10px; min-height: 27px;
   }
 
-  .roster-bar {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-    padding: 8px 10px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px;
-    background: var(--panel); font-size: 12px; color: var(--muted);
+  /* ── Rail: the signature control ──────────────────────────────────────────
+     [eyebrow label] [value or input] [icon actions] — one recessed row. Used for the webhook URL, the
+     secret, the guide link, the recipient filter and the create-instance command, so a machine value
+     looks and behaves the same wherever it turns up. */
+  .rail {
+    display: flex; align-items: stretch; margin-bottom: 8px;
+    border: 1px solid var(--edge); border-radius: var(--radius-sm); background: var(--sunk);
+    transition: border-color .12s ease;
   }
-  .roster-bar code { font-size: 11px; }
-  .badge {
-    display: inline-block; padding: 1px 6px; border-radius: 999px; font-size: 10px; font-weight: 700;
-    letter-spacing: .04em; background: var(--accent); color: var(--accent-fg);
+  .rail:last-child { margin-bottom: 0; }
+  .rail:focus-within { border-color: var(--accent); }
+  .rail > .tag {
+    display: flex; align-items: center; flex: 0 0 auto; padding: 0 10px;
+    font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--ink-dim); border-right: 1px solid var(--edge);
   }
-  .badge.gone { background: var(--danger); color: #fff; }
-  .who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .who b { font-weight: 600; }
-  .who span { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
-  .rows { display: flex; flex-direction: column; gap: 8px; }
-  .row {
-    display: grid; gap: 10px; align-items: center; padding: 6px 10px;
-    grid-template-columns: auto minmax(0, 1fr) 56px 170px auto;
-    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  .rail > input, .rail > .value {
+    flex: 1 1 auto; min-width: 0; padding: 9px 10px; border: 0; background: none; color: var(--ink);
+    /* No horizontal scrollbar on a long URL: it truncates, and Copy takes the whole value anyway. */
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .row.off { opacity: .5; }
-  .row[hidden] { display: none; }
-  .row .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .row .meta { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .row input[type="text"] { padding: 5px 8px; font-size: 13px; }
-  .row .del {
-    background: none; border: none; color: var(--muted); cursor: pointer;
-    font-size: 15px; line-height: 1; padding: 4px 6px; border-radius: 5px;
-  }
-  .row .del:hover { color: var(--danger); }
-  .filters { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
-  .filters input[type="search"] {
-    flex: 1 1 200px; min-width: 160px; padding: 7px 10px; font: inherit; font-size: 13px;
-    border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--fg);
-  }
-  .filters label { display: flex; align-items: center; gap: 6px; font-weight: 400; font-size: 12px; color: var(--muted); margin: 0; }
-  .row .col { display: flex; flex-direction: column; gap: 3px; }
-  .row .col span { font-size: 11px; color: var(--muted); }
-  .row .adm { display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
-  @media (max-width: 560px) { .row { grid-template-columns: auto 1fr auto; } .row .meta { display: none; } }
+  .rail > .value { display: flex; align-items: center; }
+  .rail > input:focus:not(:focus-visible) { outline: none; }
+  .rail .acts { display: flex; flex: 0 0 auto; border-left: 1px solid var(--edge); }
+  .rail .acts .icon:last-child { border-radius: 0 6px 6px 0; }
 
+  /* ── Buttons ──────────────────────────────────────────────────────────── */
+  .icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; padding: 0; background: none; border: 0; color: var(--ink-dim);
+    cursor: pointer; transition: color .12s ease, background-color .12s ease;
+  }
+  .icon:hover:not(:disabled) { color: var(--accent); background: var(--accent-soft); }
+  .icon:disabled { opacity: .35; cursor: default; }
+  .icon.wide { width: auto; padding: 0 11px; font: inherit; font-size: 12px; }
+  .icon.wide[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+  .icon.danger:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); }
+  .icon.armed { color: var(--danger); background: var(--danger-soft); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; border-radius: var(--radius-sm);
+    border: 1px solid var(--edge); background: var(--panel); color: var(--ink);
+    font: inherit; font-size: 12px; padding: 6px 11px; cursor: pointer; white-space: nowrap;
+    transition: border-color .12s ease, color .12s ease, background-color .12s ease;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.primary {
+    background: var(--accent); border-color: var(--accent); color: var(--accent-ink);
+    font-weight: 600; font-size: 13px; padding: 8px 15px;
+  }
+  .btn.primary:hover:not(:disabled) { filter: brightness(1.07); color: var(--accent-ink); }
+
+  :where(button, a, input, select, [tabindex="0"]):focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
+  }
+
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a.rail-link {
+    display: flex; align-items: center; gap: 7px; flex: 1 1 auto; min-width: 0;
+    padding: 9px 10px; color: var(--ink); text-decoration: none;
+    transition: color .12s ease;
+  }
+  a.rail-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  a.rail-link:hover { color: var(--accent); text-decoration: underline; }
+
+  /* ── Fields ───────────────────────────────────────────────────────────── */
+  .field { margin-bottom: 12px; }
+  .field > label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+  .field small { display: block; color: var(--ink-dim); font-size: 11px; margin-top: 5px; }
+  input[type="text"], input[type="password"], input[type="tel"], input[type="search"], select {
+    width: 100%; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--ink);
+    background: var(--sunk); border: 1px solid var(--edge); border-radius: var(--radius-sm);
+    transition: border-color .12s ease;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  input:focus:not(:focus-visible), select:focus:not(:focus-visible) { outline: none; }
+  /* Windows dark mode paints a native select unless both are stated. */
+  select { appearance: none; background-color: var(--sunk); color: var(--ink); }
+  input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1); }
+
+  /* Switch row: label, description and control share one hit target. */
+  .switch {
+    display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; cursor: pointer;
+    border-top: 1px solid var(--edge);
+  }
+  .switch:first-child { border-top: 0; padding-top: 0; }
+  .switch:last-child { padding-bottom: 0; }
+  .switch input { flex: 0 0 auto; width: 15px; height: 15px; margin: 2px 0 0; accent-color: var(--accent); }
+  .switch .txt { min-width: 0; }
+  .switch .txt b { display: block; font-size: 12px; font-weight: 600; }
+  .switch .txt small { display: block; color: var(--ink-dim); font-size: 11px; margin-top: 2px; }
+
+  /* ── Recipients ───────────────────────────────────────────────────────── */
+  .people { display: flex; flex-direction: column; gap: 6px; }
+  .person {
+    display: grid; align-items: center; gap: 9px; padding: 5px 4px 5px 10px;
+    grid-template-columns: auto minmax(0, 1fr) auto 148px auto;
+    border: 1px solid var(--edge); border-radius: var(--radius-sm); background: var(--sunk);
+    /* Cheap virtualization for a large Seerr install: off-screen rows are not laid out. */
+    content-visibility: auto; contain-intrinsic-size: auto 38px;
+  }
+  .person[hidden] { display: none; }
+  .person.off { opacity: .5; }
+  .person input[type="checkbox"] { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+  .person .who { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .person .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .person .uid { font-size: 11px; color: var(--ink-dim); }
+  .person input[type="tel"] { padding: 5px 8px; font-size: 12px; }
+  .pill {
+    flex: 0 0 auto; padding: 1px 6px; border-radius: 999px; font-size: 9px; font-weight: 700;
+    letter-spacing: .06em; background: var(--accent); color: var(--accent-ink);
+  }
+  .pill.gone { background: var(--danger); color: #fff; }
+  @media (max-width: 560px) {
+    .person { grid-template-columns: auto minmax(0, 1fr) auto; }
+    .person .uid, .person input[type="tel"] { display: none; }
+  }
+
+  /* ── Routing matrix ───────────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--edge); }
+  tbody tr:last-child td { border-bottom: 0; }
+  th {
+    color: var(--ink-dim); font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; padding-bottom: 8px; line-height: 1.25;
+  }
+  th.mark, td.mark { text-align: center; width: 78px; }
+  td.mark button {
+    width: 100%; padding: 4px 0; background: none; border: 0; border-radius: 5px;
+    font: inherit; font-size: 13px; color: var(--ink-dim); cursor: pointer;
+    transition: color .12s ease, background-color .12s ease;
+  }
+  td.mark button[aria-pressed="true"] { color: var(--accent); font-weight: 700; }
+  td.mark button:hover { background: var(--accent-soft); }
+  td.mark .na { color: var(--edge); }
+
+  /* ── Update banner ────────────────────────────────────────────────────── */
   #updateBanner {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    padding: 8px 12px; margin-bottom: 14px; border-radius: 8px; font-size: 13px;
-    border: 1px solid var(--accent); background: var(--panel);
+    padding: 8px 12px; margin-bottom: 12px; font-size: 12px;
+    border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-soft);
   }
-  #updateBanner b { font-weight: 700; }
-  #updateBanner code { font-size: 11px; color: var(--muted); }
   #updateBanner[hidden] { display: none; }
+  #updateBanner a { display: inline-flex; align-items: center; gap: 5px; }
 
-  .steps { list-style: none; margin: 0; padding: 0; }
-  .steps > li { padding: 0 0 16px 0; }
-  .steps h3 { font-size: 13px; margin: 0 0 6px; }
-  .steps p { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
-  .steps ul { margin: 0 0 8px; padding-left: 18px; font-size: 12px; color: var(--muted); }
-  .steps li + li { margin-top: 2px; }
+  /* ── Footer ───────────────────────────────────────────────────────────── */
+  .bar {
+    display: flex; align-items: center; gap: 12px; margin-top: 14px; padding-top: 12px;
+    border-top: 1px solid var(--edge);
+  }
+  #status { min-width: 0; font-size: 12px; }
+  #status.ok { color: var(--accent); }
+  #status.err { color: var(--danger); }
+
   .note {
-    border-left: 3px solid var(--accent); background: var(--panel);
-    padding: 8px 10px; font-size: 12px; color: var(--muted); border-radius: 0 6px 6px 0;
+    padding: 9px 11px; margin-bottom: 8px; font-size: 12px; color: var(--ink-dim);
+    background: var(--sunk); border-left: 2px solid var(--accent); border-radius: 0 6px 6px 0;
   }
-  .note strong { color: var(--fg); }
-  .copyline {
-    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
-    padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel);
-  }
-  .copyline code, .copyline input {
-    flex: 1 1 auto; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px; overflow-x: auto; white-space: nowrap; color: var(--fg);
-  }
-  .copyline input { border: none; background: none; padding: 0; }
-  .copyline input:focus { outline: none; }
-  .copyline .tag { font-size: 10px; color: var(--muted); white-space: nowrap; }
-  button.mini {
-    background: none; border: 1px solid var(--border); color: var(--fg); border-radius: 6px;
-    padding: 4px 9px; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
-  }
-  button.mini:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-  button.mini:disabled { opacity: .45; cursor: default; }
-  button.mini.armed { border-color: var(--danger); color: var(--danger); font-weight: 600; }
-  .setup-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
-  .warn { color: var(--danger); font-size: 12px; }
+  .note b { color: var(--ink); }
 
-  button.action {
-    background: var(--accent); color: var(--accent-fg); border: none; border-radius: 6px;
-    padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer;
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
   }
-  button.ghost { background: none; color: var(--fg); border: 1px solid var(--border); }
-  button.remove { background: none; border: 1px solid var(--border); color: var(--danger); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
-  .bar { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
-  #feedback { font-size: 13px; }
-  #feedback.ok { color: var(--ok); }
-  #feedback.err { color: var(--danger); }
 </style>
 </head>
 <body>
 
+<h1 class="sr-only">Seerr Notifications</h1>
+
+<!-- One 16px stroke set, drawn inline: the frame’s CSP allows no external image or font requests. -->
+<svg class="sr-only" aria-hidden="true" focusable="false">
+  <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />
+  </symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10.6 6.2A9.9 9.9 0 0 1 12 6c6.4 0 10 6 10 6a18 18 0 0 1-3 3.7M6.3 6.6A18 18 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 4.2-.9" />
+    <path d="m3 3 18 18M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+  </symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" />
+  </symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3.5V9h-5.5" />
+  </symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+  </symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m4 12.5 5 5L20 6.5" />
+  </symbol>
+  <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 4h6v6M20 4l-9 9" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+  </symbol>
+</svg>
+
 <div id="updateBanner" hidden>
-  <span>🎉 <b id="updateLatest"></b> is available — you are running <span id="updateCurrent"></span>.</span>
-  <code id="updateUrl"></code>
-  <button type="button" class="mini" id="copyUpdateUrl">Copy link</button>
+  <span><b id="updateLatest"></b> is out — you are running <span id="updateCurrent" class="mono"></span>.</span>
+  <a id="updateLink" href="https://github.com/Alsharad/openwa-seerr-notify/releases" rel="noopener noreferrer">
+    Release notes<svg width="13" height="13" aria-hidden="true"><use href="#i-external" /></svg>
+  </a>
 </div>
 
-<div class="tabs" role="tablist">
+<div class="tabs" role="tablist" aria-label="Settings sections">
   <button role="tab" id="tab-connection" aria-controls="panel-connection" aria-selected="true">Connection</button>
   <button role="tab" id="tab-recipients" aria-controls="panel-recipients" aria-selected="false">Recipients</button>
   <button role="tab" id="tab-routing" aria-controls="panel-routing" aria-selected="false">Who gets what</button>
@@ -183,144 +312,195 @@
   <button role="tab" id="tab-setup" aria-controls="panel-setup" aria-selected="false">Setup</button>
 </div>
 
-<section id="panel-connection" role="tabpanel" aria-labelledby="tab-connection">
-  <h2>Seerr connection</h2>
-  <p class="hint">Used to enrich notifications with overview, ratings, cast and season status. Leave blank to format from the webhook payload alone. Use the health-check button on the plugin row to test these settings.</p>
-  <div class="field">
-    <label for="jellyseerrUrl">Jellyseerr / Overseerr URL</label>
-    <input type="text" id="jellyseerrUrl" placeholder="http://192.168.1.50:5055" />
-    <small>A private-network host also needs the manifest <code>net.allow</code> entry and <code>SSRF_ALLOWED_HOSTS</code>.</small>
-  </div>
-  <div class="field">
-    <label for="jellyseerrApiKey">Seerr API key</label>
-    <input type="password" id="jellyseerrApiKey" autocomplete="off" />
-    <small>Stored masked. Leave the masked value untouched to keep the saved key.</small>
-  </div>
-  <div class="check">
-    <input type="checkbox" id="enrichmentEnabled" />
-    <div>
-      <label for="enrichmentEnabled">Enable Seerr API enrichment</label>
-      <small>Off = send from the webhook payload alone.</small>
+<section id="panel-connection" role="tabpanel" aria-labelledby="tab-connection" tabindex="0">
+  <h2>Your Seerr server</h2>
+  <p class="lede">Fills notifications out with the overview, rating, cast and season status. Leave it blank and messages still send, carrying only what the webhook itself provides.</p>
+
+  <div class="card">
+    <div class="field">
+      <label for="jellyseerrUrl">Server address</label>
+      <input type="text" id="jellyseerrUrl" name="jellyseerrUrl" class="mono" inputmode="url"
+             autocomplete="off" spellcheck="false" translate="no" placeholder="http://192.168.1.50:5055…" />
     </div>
+    <div class="field">
+      <label for="jellyseerrApiKey">API key</label>
+      <input type="password" id="jellyseerrApiKey" name="jellyseerrApiKey" class="mono"
+             autocomplete="off" spellcheck="false" translate="no" />
+      <small>Seerr → Settings → General → API Key. Stored masked; leave the masked value alone to keep the saved key.</small>
+    </div>
+    <label class="switch" for="enrichmentEnabled">
+      <input type="checkbox" id="enrichmentEnabled" name="enrichmentEnabled" />
+      <span class="txt">
+        <b>Fill notifications out from Seerr</b>
+        <small>Off: send only what the webhook payload contains — no overview, ratings, cast or season list.</small>
+      </span>
+    </label>
+    <p class="hint" style="margin-top:10px">The health-check button on the plugin row tests these: it reports the Seerr version and whether the key was accepted.</p>
   </div>
 </section>
 
-<section id="panel-recipients" role="tabpanel" aria-labelledby="tab-recipients" hidden>
-  <h2>Recipients</h2>
-  <p class="hint">
-    Every account from your Seerr instance. Tick someone and give them a WhatsApp number to start
-    notifying them. Names, emails and admin status come from Seerr and are not editable here.
-  </p>
-  <div class="roster-bar">
-    <span id="rosterMeta"></span>
-    <button type="button" class="action ghost" id="refreshRoster">Refresh from Seerr</button>
+<section id="panel-recipients" role="tabpanel" aria-labelledby="tab-recipients" tabindex="0" hidden>
+  <h2>Who can be notified</h2>
+  <p class="lede">Everyone on your Seerr server. Tick a person and give them a WhatsApp number to start notifying them. Names and admin status come from Seerr.</p>
+
+  <div class="card">
+    <div class="card-head">
+      <h3 id="rosterCount">Recipients</h3>
+      <button type="button" class="btn" id="refreshRoster">
+        <svg width="13" height="13" aria-hidden="true"><use href="#i-refresh" /></svg>Refresh from Seerr
+      </button>
+    </div>
+
+    <div class="rail">
+      <label class="tag" for="userFilter">Find</label>
+      <input type="search" id="userFilter" name="userFilter" autocomplete="off" spellcheck="false"
+             placeholder="name, email or Seerr id…" />
+      <div class="acts">
+        <button type="button" class="icon wide" id="enabledOnly" aria-pressed="false">Notified only</button>
+      </div>
+    </div>
+
+    <p class="hint" id="rosterEmpty" hidden>No Seerr accounts cached yet. Press Refresh from Seerr, then reload this page.</p>
+    <div class="people" id="userRows"></div>
   </div>
-  <div class="filters">
-    <input type="search" id="userFilter" placeholder="Filter by name, email or id…" />
-    <label><input type="checkbox" id="enabledOnly" /> Enabled only</label>
-  </div>
-  <div class="rows" id="userRows"></div>
 </section>
 
-<section id="panel-routing" role="tabpanel" aria-labelledby="tab-routing" hidden>
+<section id="panel-routing" role="tabpanel" aria-labelledby="tab-routing" tabindex="0" hidden>
   <h2>Who gets what</h2>
-  <p class="hint">
-    Click any cell to flip it. <strong>Requester / reporter</strong> is the mapped user behind the event;
-    <strong>admins</strong> is every enabled recipient Seerr marks as an admin. Someone who is both gets
-    one message — the admin one. <button type="button" class="linkish" id="routingReset">Reset to defaults</button>
-  </p>
-  <table id="routingTable">
-    <thead>
-      <tr>
-        <th>Seerr event</th>
-        <th class="mark">Requester<br />/ reporter</th>
-        <th class="mark">Admins</th>
-        <th class="mark">Admin Info<br />section</th>
-      </tr>
-    </thead>
-    <tbody id="routingBody"></tbody>
-  </table>
-  <p class="hint" id="adminCount" style="margin-top: 14px;"></p>
+  <p class="lede">Click a cell to flip it. <b>Requester</b> is the person behind the event; <b>admins</b> is every notified recipient Seerr marks as an admin. Someone who is both gets one message — the admin one.</p>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Seerr events</h3>
+      <button type="button" class="btn" id="routingReset">Reset to defaults</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Event</th>
+          <th scope="col" class="mark">Requester</th>
+          <th scope="col" class="mark">Admins</th>
+          <th scope="col" class="mark">Admin info</th>
+        </tr>
+      </thead>
+      <tbody id="routingBody"></tbody>
+    </table>
+  </div>
+  <p class="hint" id="adminCount"></p>
 </section>
 
-<section id="panel-options" role="tabpanel" aria-labelledby="tab-options" hidden>
+<section id="panel-options" role="tabpanel" aria-labelledby="tab-options" tabindex="0" hidden>
   <h2>Options</h2>
-  <div class="check">
-    <input type="checkbox" id="sendPoster" />
-    <div>
-      <label for="sendPoster">Send poster image</label>
-      <small>Attached to Now Available and Request Submitted. Sent as the caption when the message fits WhatsApp's 1024-character limit, otherwise as its own image followed by the text.</small>
+  <p class="lede">Every Now Available section — overview, rating, runtime, genres, director, cast, trailer, seasons, collection — is always on.</p>
+
+  <div class="card">
+    <label class="switch" for="sendPoster">
+      <input type="checkbox" id="sendPoster" name="sendPoster" />
+      <span class="txt">
+        <b>Send the poster</b>
+        <small>Attached to Now Available and Request Submitted, as the caption when the message fits WhatsApp’s 1024-character limit.</small>
+      </span>
+    </label>
+    <label class="switch" for="requireMappedUser">
+      <input type="checkbox" id="requireMappedUser" name="requireMappedUser" />
+      <span class="txt">
+        <b>Record events that reach nobody</b>
+        <small>On: an event matching no recipient is kept as a delivery failure you can see. Off: dropped quietly.</small>
+      </span>
+    </label>
+    <label class="switch" for="updateCheckEnabled">
+      <input type="checkbox" id="updateCheckEnabled" name="updateCheckEnabled" />
+      <span class="txt">
+        <b>Check GitHub for new releases</b>
+        <small>Once a day. Nothing is downloaded or installed. Off: no outbound request is ever made.</small>
+      </span>
+    </label>
+    <label class="switch" for="debug">
+      <input type="checkbox" id="debug" name="debug" />
+      <span class="txt">
+        <b>Verbose logging</b>
+        <small>One line per delivery: event type, recipient count, masked chat ids, send outcomes. Never logs message bodies.</small>
+      </span>
+    </label>
+  </div>
+
+  <div class="card">
+    <div class="field" style="margin-bottom:0">
+      <label for="fallbackSessionId">Fallback WhatsApp session</label>
+      <input type="text" id="fallbackSessionId" name="fallbackSessionId" class="mono"
+             autocomplete="off" spellcheck="false" translate="no" placeholder="optional…" />
+      <small>Used when the ingress instance is not bound to a session.</small>
     </div>
   </div>
-  <div class="check">
-    <input type="checkbox" id="requireMappedUser" />
-    <div>
-      <label for="requireMappedUser">Require a mapped user</label>
-      <small>On: an event matching nobody is recorded as a delivery failure. Off: dropped quietly.</small>
+
+  <div class="card">
+    <div class="card-head" style="margin:0">
+      <p class="hint" id="updateMeta"></p>
+      <button type="button" class="btn" id="checkUpdate">Check for updates</button>
     </div>
-  </div>
-  <div class="check">
-    <input type="checkbox" id="debug" />
-    <div>
-      <label for="debug">Debug mode</label>
-      <small>Log each delivery: event type, recipient count, masked chat ids, send outcomes. Never logs message bodies.</small>
-    </div>
-  </div>
-  <div class="check">
-    <input type="checkbox" id="updateCheckEnabled" />
-    <div>
-      <label for="updateCheckEnabled">Check GitHub for new releases</label>
-      <small>Once a day, ask github.com whether a newer release exists and show a banner if so. Nothing is downloaded or installed. Off = no outbound request is ever made.</small>
-      <small><button type="button" class="linkish" id="checkUpdate">Check now</button> <span id="updateMeta"></span></small>
-    </div>
-  </div>
-  <div class="field">
-    <label for="fallbackSessionId">Fallback WhatsApp session</label>
-    <input type="text" id="fallbackSessionId" placeholder="(optional)" />
-    <small>Used when the ingress instance is not bound to a session.</small>
   </div>
 </section>
 
-<section id="panel-setup" role="tabpanel" aria-labelledby="tab-setup" hidden>
+<section id="panel-setup" role="tabpanel" aria-labelledby="tab-setup" tabindex="0" hidden>
   <h2>Point Seerr at this plugin</h2>
-  <p class="hint">Seerr → Settings → Notifications → Webhook. Tick <strong>Enable Agent</strong>, fill in these two, Save.</p>
+  <p class="lede">Seerr → Settings → Notifications → Webhook. Tick <b>Enable Agent</b>, fill in these two, Save.</p>
 
-  <div id="instanceList"></div>
+  <div class="card">
+    <div id="instanceList"></div>
 
-  <div class="copyline">
-    <span class="tag">Webhook URL</span>
-    <code id="webhookUrl"></code>
-    <button type="button" class="mini" id="copyUrl">Copy</button>
-  </div>
+    <div class="rail">
+      <span class="tag" id="urlLabel">Webhook URL</span>
+      <input type="text" id="webhookUrl" readonly aria-labelledby="urlLabel"
+             spellcheck="false" translate="no" />
+      <div class="acts">
+        <button type="button" class="icon" id="copyUrl" aria-label="Copy the webhook URL">
+          <svg width="15" height="15" aria-hidden="true"><use href="#i-copy" /></svg>
+        </button>
+      </div>
+    </div>
 
-  <div class="copyline">
-    <span class="tag">Authorization Header</span>
-    <input type="text" id="ingressSecret" readonly placeholder="press Generate →" />
-    <button type="button" class="mini" id="copySecret">Copy</button>
-    <button type="button" class="mini" id="clearSecret">Clear</button>
+    <div class="rail">
+      <span class="tag" id="secretLabel">Authorization Header</span>
+      <input type="password" id="ingressSecret" readonly aria-labelledby="secretLabel"
+             spellcheck="false" translate="no" placeholder="64 hex characters…" />
+      <div class="acts">
+        <button type="button" class="icon" id="revealSecret" aria-label="Show the secret" aria-pressed="false">
+          <svg width="15" height="15" aria-hidden="true"><use href="#i-eye" /></svg>
+        </button>
+        <button type="button" class="icon" id="copySecret" aria-label="Copy the secret">
+          <svg width="15" height="15" aria-hidden="true"><use href="#i-copy" /></svg>
+        </button>
+        <button type="button" class="icon" id="generateSecret" aria-label="Generate a new secret">
+          <svg width="15" height="15" aria-hidden="true"><use href="#i-refresh" /></svg>
+        </button>
+      </div>
+    </div>
+
+    <label class="sr-only" for="secretInstance">Instance to generate a secret for</label>
     <select id="secretInstance" hidden></select>
-    <button type="button" class="mini" id="generateSecret">Generate</button>
+    <p class="hint" id="secretWarning" hidden>
+      Generating replaces the current secret, and Seerr gets <code>401</code> until you paste the new one in.
+      Press the button again to confirm.
+    </p>
+
+    <p class="hint" style="margin-top:10px">
+      Leave the <b>JSON Payload</b> at Seerr’s default, tick the notification types you want, and Save.
+      Who gets what decides who receives each one.
+    </p>
   </div>
-  <p class="hint" id="secretMeta"></p>
-  <p class="warn" id="secretWarning" hidden>
-    Replaces the current secret — Seerr gets <code>401</code> until you paste the new one in. Click again to confirm.
-  </p>
 
-  <p class="hint">
-    Leave the <strong>JSON Payload</strong> at Seerr's default, tick the notification types you want, and Save.
-    <strong>Who gets what</strong> decides who receives each one.
-  </p>
-
-  <div class="copyline">
+  <div class="rail">
     <span class="tag">Full guide</span>
-    <code id="repoUrl">https://github.com/Alsharad/openwa-seerr-notify#setup</code>
-    <button type="button" class="mini" id="copyRepo">Copy</button>
+    <a class="rail-link" id="repoLink" href="https://github.com/Alsharad/openwa-seerr-notify#setup" rel="noopener noreferrer">
+      <span translate="no">github.com/Alsharad/openwa-seerr-notify</span>
+      <svg width="13" height="13" aria-hidden="true"><use href="#i-external" /></svg>
+    </a>
   </div>
 </section>
 
 <div class="bar">
-  <button type="button" class="action" id="save">Save configuration</button>
-  <span id="feedback"></span>
+  <button type="button" class="btn primary" id="save">Save configuration</button>
+  <span id="status" role="status" aria-live="polite"></span>
 </div>
 
 <script>
@@ -333,46 +513,69 @@
   var el = function (id) { return document.getElementById(id); };
   var saveBtn = el('save');
   var refreshBtn = el('refreshRoster');
-  var feedback = el('feedback');
+  var statusLine = el('status');
   var userRows = el('userRows');
-  /** Round-tripped unchanged on an ordinary save; re-stamped only by "Refresh from Seerr". */
+
+  /** Round-tripped unchanged on an ordinary save; re-stamped only by Refresh from Seerr. */
   var refreshToken = '';
   /**
-   * The Setup tab's state, written by the plugin and round-tripped verbatim here. The editor changes
-   * exactly one field of it — clearing the secret — and never invents the rest: it has no network, so
-   * ingress URLs, the secret and the release check can only come from the plugin.
+   * The Setup tab's state, written by the plugin and round-tripped verbatim. The editor invents none of
+   * it: this frame has no network, so ingress URLs, the secret and the release check can only arrive
+   * with a config handshake.
    */
   var setup = {};
-  /** Stamped by a Setup button, cleared by the plugin once the action has run. */
+  /** Stamped by a Setup action, cleared by the plugin once the action has run. */
   var setupToken = '';
   /**
-   * A Setup action in flight. The plugin writes its result to config a second or two AFTER the save that
-   * asked for it, and the host answers config:get from the plugin list the dashboard already holds — so
-   * the new value is invisible until something makes the dashboard re-read it. Only a save does that
-   * (Plugins.tsx invalidates the plugins query on a successful config:save), so this re-saves and
-   * re-reads on a short schedule until the plugin's write shows up. See waitForSetupResult.
+   * A Setup action in flight. The plugin writes its result to config a moment AFTER the save that asked
+   * for it, and the dashboard answers config:get from the plugin list it already holds — so the new
+   * value stays invisible until something makes it re-read. That is what waitForSetupResult does.
    */
   var pending = null;
-  /** How long to wait before each re-read. The last is generous: the GitHub check has an 8 s budget. */
   var SETUP_POLL_MS = [2500, 5000, 9000];
 
+  var clock = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+
+  function setStatus(message, ok) {
+    statusLine.textContent = message;
+    statusLine.className = message ? (ok ? 'ok' : 'err') : '';
+  }
+
+  function icon(name, size) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', size || 15);
+    svg.setAttribute('height', size || 15);
+    svg.setAttribute('aria-hidden', 'true');
+    var use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', '#' + name);
+    svg.appendChild(use);
+    return svg;
+  }
+
   // ── Clipboard ───────────────────────────────────────────────────────────
-  // The frame is sandboxed with an opaque origin and (over plain http) is not a secure context, so
+  // This frame is sandboxed with an opaque origin and, over plain http, is not a secure context — so
   // navigator.clipboard is frequently absent or rejects. execCommand is the fallback that does work
-  // here; if both fail the text is left selected, which is the one thing that always works.
+  // here; if both fail the text is left selected, which always works.
   function copyText(text, button, sourceInput) {
+    if (!text) return;
+
     var done = function (ok) {
+      setStatus(ok ? 'Copied.' : 'Press Ctrl+C to copy the selected value.', ok);
       if (!button) return;
-      var original = button.getAttribute('data-label') || button.textContent;
-      button.setAttribute('data-label', original);
-      button.textContent = ok ? 'Copied' : 'Press Ctrl+C';
-      setTimeout(function () { button.textContent = original; }, 1600);
+      var original = button.firstChild;
+      button.replaceChild(icon('i-check'), original);
+      setTimeout(function () {
+        if (button.firstChild) button.replaceChild(original, button.firstChild);
+      }, 1400);
     };
 
     var scratch = sourceInput;
+    var masked = scratch && scratch.type === 'password';
+    if (masked) scratch.type = 'text';
     if (!scratch) {
       scratch = document.createElement('input');
       scratch.value = text;
+      scratch.setAttribute('aria-hidden', 'true');
       scratch.style.position = 'fixed';
       scratch.style.opacity = '0';
       document.body.appendChild(scratch);
@@ -383,9 +586,10 @@
 
     var ok = false;
     try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+    if (masked) scratch.type = 'password';
     if (!sourceInput) document.body.removeChild(scratch);
-
     if (ok) { done(true); return; }
+
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
@@ -395,178 +599,43 @@
     done(false);
   }
 
-  // ── Setup tab ───────────────────────────────────────────────────────────
-  function copyLine(tag, text) {
-    var line = document.createElement('div');
-    line.className = 'copyline';
-
-    var label = document.createElement('span');
-    label.className = 'tag';
-    label.textContent = tag;
-
-    var value = document.createElement('code');
-    value.textContent = text;
-
-    var button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'mini';
-    button.textContent = 'Copy';
-    button.addEventListener('click', function () { copyText(text, button); });
-
-    line.appendChild(label);
-    line.appendChild(value);
-    line.appendChild(button);
-    return line;
-  }
-
-  function renderInstances() {
-    var list = el('instanceList');
-    var picker = el('secretInstance');
-    var instances = Array.isArray(setup.instances) ? setup.instances : [];
-    list.innerHTML = '';
-    picker.innerHTML = '';
-
-    if (instances.length === 0) {
-      var none = document.createElement('div');
-      none.className = 'note';
-      none.innerHTML =
-        '<strong>No ingress instance exists yet</strong> — Seerr has nowhere to post until one does. Run this on ' +
-        'the OpenWA host with an admin API key, then press Check again. The response also contains the secret, ' +
-        'so you can skip Generate if you keep it.';
-      list.appendChild(none);
-      list.appendChild(copyLine(
-        'curl',
-        "curl -sX POST http://<openwa-host>:<openwa-port>/api/integration/plugins/seerr-notify/instances " +
-        "-H 'X-API-Key: <admin key>' -H 'Content-Type: application/json' " +
-        '-d \'{"instanceId":"seerr-prod"}\''
-      ));
-      // Only shown while there is nothing to show: an instance created after the plugin started is
-      // invisible here until something re-reads the list. Once one exists, the button goes with the message.
-      var again = document.createElement('button');
-      again.type = 'button';
-      again.className = 'mini';
-      again.textContent = 'Check again';
-      again.addEventListener('click', function () {
-        requestSetup('instances', '', 'Looking for an ingress instance…');
-      });
-      list.appendChild(again);
-    }
-
-    instances.forEach(function (instance) {
-      var option = document.createElement('option');
-      option.value = instance.instanceId;
-      option.textContent = instance.instanceId;
-      picker.appendChild(option);
-    });
-
-    // buildIngressUrls returns a bare path when the gateway has no BASE_URL — the host is the operator's
-    // to supply, and guessing it here would hand Seerr a URL that silently never connects.
-    var chosen = instances.length > 1 && setup.secretFor
-      ? instances.filter(function (i) { return i.instanceId === setup.secretFor; })[0] || instances[0]
-      : instances[0];
-    var url = chosen ? chosen.url || '' : '';
-    el('webhookUrl').textContent = !chosen
-      ? '—'
-      : (chosen.relative ? 'http://<openwa-host>:<openwa-port>' + url : url);
-
-    picker.hidden = instances.length < 2;
-    el('generateSecret').disabled = instances.length === 0;
-    if (setup.secretFor) picker.value = setup.secretFor;
-  }
-
-  function renderSetup() {
-    renderInstances();
-
-    var secret = typeof setup.secret === 'string' ? setup.secret : '';
-    el('ingressSecret').value = secret;
-    el('copySecret').disabled = secret === '';
-    el('clearSecret').disabled = secret === '';
-    el('secretMeta').textContent = secret ? 'Copy it into Seerr, then press Clear.' : '';
-
-    var update = setup.update || null;
-    el('updateMeta').textContent = !update
-      ? 'Never checked.'
-      : 'Checked ' + new Date(update.checkedAt).toLocaleString() +
-        (update.available ? ' — v' + update.latest + ' available.' : (update.note ? ' — ' + update.note + '.' : '.'));
-
-    if (setup.error) showFeedback(setup.error, false);
-
-    var banner = el('updateBanner');
-    banner.hidden = !(update && update.available);
-    if (update && update.available) {
-      el('updateLatest').textContent = 'v' + update.latest;
-      el('updateCurrent').textContent = 'v' + update.current;
-      el('updateUrl').textContent = update.url;
-    }
-  }
-
-  // Same mechanism as "Refresh from Seerr": the editor cannot fetch, so it saves a token the plugin acts
-  // on. Unlike that button, this then waits for the answer and renders it in place.
-  function requestSetup(action, arg, label) {
-    setupToken = action + '|' + (arg || '') + '|' + new Date().toISOString();
-    pending = { token: setupToken, action: action, label: label, tries: 0, phase: 'action' };
-    saveBtn.disabled = true;
-    refreshBtn.disabled = true;
-    showFeedback(label, true);
-    parent.postMessage({ type: 'config:save', config: assembleConfig() }, '*');
-  }
-
-  /**
-   * Ask the dashboard to re-read config, so the plugin's write-back becomes visible here.
-   *
-   * The save is what forces the re-read; `setup` and `setupRequestedAt` are stripped from it precisely
-   * because config writes merge shallowly host-side, so omitting them leaves the plugin's fresh values
-   * untouched. Sending our stale copy back would overwrite the very thing we are waiting for.
-   */
-  function waitForSetupResult() {
-    if (!pending) return;
-    if (pending.tries >= SETUP_POLL_MS.length) {
-      showFeedback(pending.label + ' Still running — reload the dashboard to see the result.', true);
-      finishSetup();
-      return;
-    }
-    var wait = SETUP_POLL_MS[pending.tries];
-    pending.tries += 1;
-    setTimeout(function () {
-      if (!pending) return;
-      pending.phase = 'reread';
-      var cfg = assembleConfig();
-      delete cfg.setup;
-      delete cfg.setupRequestedAt;
-      parent.postMessage({ type: 'config:save', config: cfg }, '*');
-    }, wait);
-  }
-
-  /** What to say once the plugin's answer has landed — the useful next step, not "OK". */
-  function setupDone(action) {
-    if (action === 'secret') return 'New secret generated below. Copy it into Seerr, then press Clear.';
-    if (action === 'instances') return 'Instance list re-read from OpenWA.';
-    var update = setup.update || {};
-    if (update.available) return 'Version ' + update.latest + ' is available — the link is at the top.';
-    return update.note ? 'Update check: ' + update.note + '.' : 'Update check finished.';
-  }
-
-  function finishSetup() {
-    pending = null;
-    saveBtn.disabled = false;
-    refreshBtn.disabled = false;
+  // A sandboxed frame is not given allow-popups, so a link cannot open a tab. Try anyway — the panel may
+  // one day be framed less strictly — and fall back to putting the URL on the clipboard.
+  function openExternal(event, url) {
+    event.preventDefault();
+    var opened = null;
+    try { opened = window.open(url, '_blank', 'noopener'); } catch (err) { opened = null; }
+    if (opened) return;
+    copyText(url, null);
+    setStatus('This panel cannot open tabs — the link is on your clipboard.', true);
   }
 
   // ── Tabs ────────────────────────────────────────────────────────────────
   var tabs = [].slice.call(document.querySelectorAll('[role="tab"]'));
-  tabs.forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      tabs.forEach(function (other) {
-        var selected = other === tab;
-        other.setAttribute('aria-selected', selected ? 'true' : 'false');
-        el(other.getAttribute('aria-controls')).hidden = !selected;
-      });
+  function selectTab(tab) {
+    tabs.forEach(function (other) {
+      var selected = other === tab;
+      other.setAttribute('aria-selected', selected ? 'true' : 'false');
+      other.tabIndex = selected ? 0 : -1;
+      el(other.getAttribute('aria-controls')).hidden = !selected;
+    });
+  }
+  tabs.forEach(function (tab, index) {
+    tab.addEventListener('click', function () { selectTab(tab); });
+    tab.addEventListener('keydown', function (event) {
+      var step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+      if (!step) return;
+      event.preventDefault();
+      var next = tabs[(index + step + tabs.length) % tabs.length];
+      selectTab(next);
+      next.focus();
     });
   });
+  selectTab(tabs[0]);
 
   // ── Routing ─────────────────────────────────────────────────────────────
   // Mirrors DEFAULT_ROUTING in routing.ts. config-ui.test.ts parses this block and fails if the two
-  // disagree, so the editor cannot start offering defaults the plugin does not actually apply.
+  // disagree, so the editor cannot offer defaults the plugin does not actually apply.
   var DEFAULT_ROUTING = {
     MEDIA_PENDING:        { user: true,  admin: true,  adminInfo: true  },
     MEDIA_APPROVED:       { user: true,  admin: true,  adminInfo: true  },
@@ -582,9 +651,10 @@
     TEST_NOTIFICATION:    { user: false, admin: true,  adminInfo: false }
   };
   var ROUTED_EVENTS = Object.keys(DEFAULT_ROUTING);
-  /** A test carries no requester and no ids, so an Admin Info block would be an empty heading. */
+  /** A test carries no requester and no ids, so an Admin info block would be an empty heading. */
   function supportsAdminInfo(event) { return event !== 'TEST_NOTIFICATION'; }
 
+  var COLUMN_LABEL = { user: 'the requester', admin: 'admins', adminInfo: 'the admin info block' };
   var routing = {};
 
   function renderRouting() {
@@ -599,25 +669,31 @@
       var label = document.createElement('td');
       var code = document.createElement('code');
       code.textContent = event;
+      code.setAttribute('translate', 'no');
       label.appendChild(code);
       tr.appendChild(label);
 
       ['user', 'admin', 'adminInfo'].forEach(function (key) {
         var td = document.createElement('td');
-        var applicable = key !== 'adminInfo' || supportsAdminInfo(event);
+        td.className = 'mark';
 
-        if (!applicable) {
-          td.className = 'mark na';
-          td.textContent = '—';
-          td.title = 'This event has nothing to put in an Admin Info block';
+        if (key === 'adminInfo' && !supportsAdminInfo(event)) {
+          var na = document.createElement('span');
+          na.className = 'na';
+          na.textContent = '—';
+          na.title = 'This event carries nothing to put in an admin info block';
+          td.appendChild(na);
         } else {
-          td.className = 'mark toggle ' + (cells[key] ? 'yes' : 'no');
-          td.textContent = cells[key] ? '✓' : '—';
-          td.title = 'Click to flip';
-          td.addEventListener('click', function () {
+          var toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.textContent = cells[key] ? '✓' : '—';
+          toggle.setAttribute('aria-pressed', cells[key] ? 'true' : 'false');
+          toggle.setAttribute('aria-label', event + ' reaches ' + COLUMN_LABEL[key]);
+          toggle.addEventListener('click', function () {
             routing[event][key] = !routing[event][key];
             renderRouting();
           });
+          td.appendChild(toggle);
         }
         tr.appendChild(td);
       });
@@ -636,127 +712,302 @@
       };
     });
     renderRouting();
+    setStatus('Routing reset to defaults. Save to keep it.', true);
   }
 
   // ── Recipients ──────────────────────────────────────────────────────────
-  // One row per Seerr account, from the roster cached in config by refresh-roster.mjs. The editor is an
-  // opaque-origin sandbox with no network, so it cannot fetch Seerr itself — the roster arrives with
-  // config:value or not at all. Rows whose id is absent from the roster are still rendered (they were
-  // configured before the account was deleted, or before the first refresh) so a mapping is never
-  // silently dropped by a stale roster.
+  // One row per Seerr account, from the roster the plugin caches in config. A row whose id is absent
+  // from the roster is still rendered — the account was deleted, or the roster has never been fetched —
+  // so a mapping is never silently dropped by a stale roster.
   var roster = [];
   var rosterSyncedAt = '';
 
-  function renderRow(entry, mapping) {
-    var row = document.createElement('div');
-    row.className = 'row';
-
-    var enabled = document.createElement('input');
-    enabled.type = 'checkbox';
-    enabled.checked = mapping ? mapping.enabled !== false : false;
-    enabled.title = 'Notify this user';
-
-    var name = document.createElement('div');
-    name.className = 'name';
-    name.appendChild(document.createTextNode(entry.name || ('Seerr user ' + entry.id)));
-    if (entry.isAdmin) { name.appendChild(document.createTextNode(' ')); name.appendChild(badge('ADMIN', '')); }
-    // Only meaningful once a roster exists: with none cached, EVERY row would be flagged, which reads
-    // as data loss rather than "you have not run the refresh yet".
-    if (entry.missing && roster.length > 0) { name.appendChild(document.createTextNode(' ')); name.appendChild(badge('NOT IN SEERR', 'gone')); }
-
-    var meta = document.createElement('div');
-    meta.className = 'meta';
-    // Email stays in the roster (identityFor falls back to it, and the filter still searches it) but is
-    // not rendered — 24 addresses is clutter, not information.
-    meta.textContent = 'id ' + entry.id;
-
-    var phone = document.createElement('input');
-    phone.type = 'text';
-    phone.placeholder = '+96512345678';
-    phone.value = mapping && mapping.number ? String(mapping.number) : '';
-
-    var del = document.createElement('button');
-    del.type = 'button';
-    del.className = 'del';
-    del.textContent = '✕';
-    del.title = 'Clear this mapping';
-    del.addEventListener('click', function () {
-      // A Seerr account cannot be deleted from here — clearing its mapping is what "delete" means. A
-      // row that is no longer in Seerr has nothing to fall back to, so that one is removed outright.
-      if (entry.missing) {
-        row.parentNode.removeChild(row);
-      } else {
-        enabled.checked = false;
-        phone.value = '';
-        sync();
-      }
-      refreshCounts();
-    });
-
-    function sync() { row.className = enabled.checked ? 'row' : 'row off'; }
-    enabled.addEventListener('change', function () { sync(); refreshCounts(); });
-    phone.addEventListener('input', refreshCounts);
-    sync();
-
-    row.appendChild(enabled);
-    row.appendChild(name);
-    row.appendChild(meta);
-    row.appendChild(phone);
-    row.appendChild(del);
-
-    row.readMapping = function () {
-      return { seerrUserId: entry.id, number: phone.value.trim(), enabled: enabled.checked };
-    };
-    row.isAdmin = function () { return entry.isAdmin === true; };
-    row.isLive = function () { return enabled.checked && phone.value.trim() !== ''; };
-    row.matches = function (needle) {
-      if (!needle) return true;
-      return (String(entry.name || '') + ' ' + String(entry.email || '') + ' ' + entry.id).toLowerCase().indexOf(needle) !== -1;
-    };
-    return row;
-  }
-
-  function badge(text, extra) {
+  function pill(text, extra) {
     var span = document.createElement('span');
-    span.className = extra ? 'badge ' + extra : 'badge';
+    span.className = 'pill' + (extra ? ' ' + extra : '');
     span.textContent = text;
     return span;
   }
 
+  function renderPerson(entry, mapping) {
+    var label = entry.name || ('user ' + entry.id);
+    var row = document.createElement('div');
+    row.className = 'person';
+
+    var notify = document.createElement('input');
+    notify.type = 'checkbox';
+    notify.checked = mapping ? mapping.enabled !== false : false;
+    notify.setAttribute('aria-label', 'Notify ' + label);
+
+    var who = document.createElement('div');
+    who.className = 'who';
+    var name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = entry.name || ('User ' + entry.id);
+    who.appendChild(name);
+    if (entry.isAdmin) who.appendChild(pill('ADMIN'));
+    if (entry.missing) who.appendChild(pill('NOT IN SEERR', 'gone'));
+
+    var uid = document.createElement('span');
+    uid.className = 'uid mono';
+    uid.textContent = '#' + entry.id;
+
+    var phone = document.createElement('input');
+    phone.type = 'tel';
+    phone.className = 'mono';
+    phone.inputMode = 'tel';
+    phone.autocomplete = 'off';
+    phone.spellcheck = false;
+    phone.placeholder = '96550001234…';
+    phone.value = mapping ? mapping.number || '' : '';
+    phone.setAttribute('aria-label', 'WhatsApp number for ' + label);
+
+    function sync() { row.className = notify.checked ? 'person' : 'person off'; }
+
+    // Two presses: a cleared mapping cannot be recovered from this panel, and a sandboxed frame has no
+    // confirm() to fall back on (modals need allow-modals, which it is not given).
+    var clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'icon danger';
+    clear.setAttribute('aria-label', 'Clear the mapping for ' + label);
+    clear.appendChild(icon('i-trash', 14));
+    var armed = false;
+    clear.addEventListener('click', function () {
+      if (!armed) {
+        armed = true;
+        clear.classList.add('armed');
+        clear.setAttribute('aria-label', 'Press again to clear the mapping for ' + label);
+        setStatus('Press again to clear ' + label + '.', false);
+        setTimeout(function () {
+          armed = false;
+          clear.classList.remove('armed');
+          clear.setAttribute('aria-label', 'Clear the mapping for ' + label);
+        }, 4000);
+        return;
+      }
+      armed = false;
+      clear.classList.remove('armed');
+      phone.value = '';
+      notify.checked = false;
+      sync();
+      refreshCounts();
+      setStatus('Cleared ' + label + '. Save to keep it.', true);
+    });
+
+    sync();
+    notify.addEventListener('change', function () { sync(); refreshCounts(); });
+    phone.addEventListener('input', refreshCounts);
+
+    row.appendChild(notify);
+    row.appendChild(who);
+    row.appendChild(uid);
+    row.appendChild(phone);
+    row.appendChild(clear);
+
+    row.readMapping = function () {
+      return { seerrUserId: entry.id, number: phone.value.trim(), enabled: notify.checked };
+    };
+    row.isAdmin = function () { return entry.isAdmin === true; };
+    row.isLive = function () { return notify.checked && phone.value.trim() !== ''; };
+    row.matches = function (needle) {
+      if (!needle) return true;
+      return (entry.name + ' ' + (entry.email || '') + ' ' + entry.id).toLowerCase().indexOf(needle) !== -1;
+    };
+    return row;
+  }
+
+  function currentRows() { return [].slice.call(userRows.children); }
+
   function applyFilter() {
     var needle = el('userFilter').value.trim().toLowerCase();
-    var onlyEnabled = el('enabledOnly').checked;
+    var liveOnly = el('enabledOnly').getAttribute('aria-pressed') === 'true';
     currentRows().forEach(function (row) {
-      row.hidden = !(row.matches(needle) && (!onlyEnabled || row.isLive()));
+      row.hidden = !row.matches(needle) || (liveOnly && !row.isLive());
     });
   }
 
-  function currentRows() {
-    return [].slice.call(userRows.querySelectorAll('.row'));
+  function refreshCounts() {
+    var rows = currentRows();
+    var live = rows.filter(function (row) { return row.isLive(); });
+    var admins = live.filter(function (row) { return row.isAdmin(); });
+
+    el('rosterCount').textContent = rows.length === 0
+      ? 'Recipients'
+      : live.length + ' of ' + rows.length + ' will be notified';
+    el('rosterEmpty').hidden = rows.length > 0;
+    el('adminCount').textContent = admins.length === 0
+      ? 'Nobody notified is a Seerr admin yet, so nothing in the Admins column can be delivered.'
+      : admins.length + ' of the people you notify are Seerr admins.';
   }
 
-  // Surfaces what the fixed routing table cannot: whether anyone is actually reachable, and whether any
-  // admin is — a test notification with no enabled admin reaches nobody, which reads as a broken webhook
-  // rather than a configuration gap.
-  function refreshCounts() {
-    var live = currentRows().filter(function (row) { return row.isLive(); });
-    var admins = live.filter(function (row) { return row.isAdmin(); });
-    var note = el('adminCount');
-    if (!note) return;
-    if (live.length === 0) {
-      note.textContent = 'No recipient is enabled with a number — nothing can be delivered.';
-    } else if (admins.length === 0) {
-      note.textContent = 'No enabled recipient is a Seerr admin, so the admin rows above reach nobody (including TEST_NOTIFICATION).';
-    } else {
-      note.textContent = live.length + ' recipient(s) enabled, ' + admins.length + ' of them Seerr admin(s).';
+  // ── Setup ───────────────────────────────────────────────────────────────
+  function renderInstances() {
+    var list = el('instanceList');
+    var picker = el('secretInstance');
+    var instances = Array.isArray(setup.instances) ? setup.instances : [];
+    list.innerHTML = '';
+    picker.innerHTML = '';
+
+    if (instances.length === 0) {
+      var note = document.createElement('div');
+      note.className = 'note';
+      note.innerHTML =
+        '<b>No ingress instance exists yet</b> — Seerr has nowhere to post until one does. Run this on the ' +
+        'OpenWA host with an admin API key, then press Check again. The response also carries the secret.';
+      list.appendChild(note);
+
+      var command = "curl -sX POST http://<openwa-host>:<openwa-port>/api/integration/plugins/seerr-notify/instances " +
+        "-H 'X-API-Key: <admin key>' -H 'Content-Type: application/json' -d '{\"instanceId\":\"seerr-prod\"}'";
+
+      var rail = document.createElement('div');
+      rail.className = 'rail';
+
+      var tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = 'Run';
+
+      var value = document.createElement('span');
+      value.className = 'value';
+      value.textContent = command;
+      value.title = command;
+      value.setAttribute('translate', 'no');
+
+      var acts = document.createElement('div');
+      acts.className = 'acts';
+
+      var copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'icon';
+      copy.setAttribute('aria-label', 'Copy the command');
+      copy.appendChild(icon('i-copy'));
+      copy.addEventListener('click', function () { copyText(command, copy); });
+
+      // Shown only while there is nothing to show: an instance created after the plugin started is
+      // invisible here until something re-reads the list. Once one exists, this goes with the message.
+      var again = document.createElement('button');
+      again.type = 'button';
+      again.className = 'icon wide';
+      again.textContent = 'Check again';
+      again.addEventListener('click', function () {
+        requestSetup('instances', '', 'Looking for an ingress instance…');
+      });
+
+      acts.appendChild(copy);
+      acts.appendChild(again);
+      rail.appendChild(tag);
+      rail.appendChild(value);
+      rail.appendChild(acts);
+      list.appendChild(rail);
+    }
+
+    instances.forEach(function (instance) {
+      var option = document.createElement('option');
+      option.value = instance.instanceId;
+      option.textContent = instance.instanceId;
+      picker.appendChild(option);
+    });
+
+    // buildIngressUrls returns a bare path when the gateway has no BASE_URL — the host is the operator's
+    // to supply, and guessing it here would hand Seerr a URL that silently never connects.
+    var chosen = instances.length > 1 && setup.secretFor
+      ? instances.filter(function (i) { return i.instanceId === setup.secretFor; })[0] || instances[0]
+      : instances[0];
+    var url = chosen ? chosen.url || '' : '';
+    var shown = !chosen ? '' : (chosen.relative ? 'http://<openwa-host>:<openwa-port>' + url : url);
+
+    el('webhookUrl').value = shown;
+    el('webhookUrl').title = shown;
+    el('copyUrl').disabled = shown === '';
+    picker.hidden = instances.length < 2;
+    el('generateSecret').disabled = instances.length === 0;
+    if (setup.secretFor) picker.value = setup.secretFor;
+  }
+
+  function renderSetup() {
+    renderInstances();
+
+    var secret = typeof setup.secret === 'string' ? setup.secret : '';
+    var field = el('ingressSecret');
+    var reveal = el('revealSecret');
+    field.value = secret;
+    field.type = 'password';
+    reveal.setAttribute('aria-pressed', 'false');
+    reveal.setAttribute('aria-label', 'Show the secret');
+    reveal.replaceChild(icon('i-eye'), reveal.firstChild);
+    reveal.disabled = secret === '';
+    el('copySecret').disabled = secret === '';
+
+    var update = setup.update || null;
+    el('updateMeta').textContent = !update
+      ? 'Never checked for updates.'
+      : update.available
+        ? 'Version ' + update.latest + ' is available.'
+        : 'Checked at ' + clock.format(new Date(update.checkedAt)) + ' — ' + (update.note || 'up to date') + '.';
+
+    var banner = el('updateBanner');
+    banner.hidden = !(update && update.available);
+    if (update && update.available) {
+      el('updateLatest').textContent = 'Version ' + update.latest;
+      el('updateCurrent').textContent = update.current;
+      el('updateLink').href = update.url;
     }
   }
 
-  // ── Host bridge ─────────────────────────────────────────────────────────
+  function requestSetup(action, arg, label) {
+    setupToken = action + '|' + (arg || '') + '|' + new Date().toISOString();
+    pending = { token: setupToken, action: action, label: label, tries: 0, phase: 'action' };
+    saveBtn.disabled = true;
+    refreshBtn.disabled = true;
+    setStatus(label, true);
+    parent.postMessage({ type: 'config:save', config: assembleConfig() }, '*');
+  }
+
+  /**
+   * Ask the dashboard to re-read config, so the plugin's write-back becomes visible here.
+   *
+   * The save is what forces the re-read; `setup` and `setupRequestedAt` are stripped from it precisely
+   * because config writes merge shallowly host-side, so omitting them leaves the plugin's fresh values
+   * untouched. Sending our stale copy back would overwrite the very thing we are waiting for.
+   */
+  function waitForSetupResult() {
+    if (!pending) return;
+    if (pending.tries >= SETUP_POLL_MS.length) {
+      setStatus(pending.label + ' Still running — reload the dashboard to see the result.', true);
+      finishSetup();
+      return;
+    }
+    var wait = SETUP_POLL_MS[pending.tries];
+    pending.tries += 1;
+    setTimeout(function () {
+      if (!pending) return;
+      pending.phase = 'reread';
+      var cfg = assembleConfig();
+      delete cfg.setup;
+      delete cfg.setupRequestedAt;
+      parent.postMessage({ type: 'config:save', config: cfg }, '*');
+    }, wait);
+  }
+
+  /** What to say once the plugin's answer lands — the next step, not "OK". */
+  function setupDone(action) {
+    if (action === 'secret') return 'New secret ready. Copy it into Seerr.';
+    if (action === 'instances') return 'Instance list re-read from OpenWA.';
+    var update = setup.update || {};
+    if (update.available) return 'Version ' + update.latest + ' is available — see the banner.';
+    return update.note ? 'Update check: ' + update.note + '.' : 'Update check finished.';
+  }
+
+  function finishSetup() {
+    pending = null;
+    saveBtn.disabled = false;
+    refreshBtn.disabled = false;
+  }
+
+  // ── Config in and out ───────────────────────────────────────────────────
   function populateConfig(config) {
     var cfg = config || {};
     SCALARS.forEach(function (key) { el(key).value = cfg[key] === undefined || cfg[key] === null ? '' : String(cfg[key]); });
-    // Every boolean defaults ON except debug, matching the manifest's declared defaults.
+    // Every switch defaults on except debug, matching the manifest's declared defaults.
     BOOLEANS.forEach(function (key) {
       var fallback = key !== 'debug';
       el(key).checked = typeof cfg[key] === 'boolean' ? cfg[key] : fallback;
@@ -767,50 +1018,42 @@
     refreshToken = typeof cfg.rosterRefreshRequestedAt === 'string' ? cfg.rosterRefreshRequestedAt : '';
 
     setup = cfg.setup && typeof cfg.setup === 'object' ? cfg.setup : {};
-    // Normally '' — the plugin clears it once the action has run. A non-empty value here means an action
-    // is still in flight, and re-sending it verbatim is harmless: the plugin ignores a token it has done.
+    // Normally '' — the plugin clears it once the action has run. A non-empty value means an action is
+    // still in flight, and re-sending it verbatim is harmless: the plugin ignores a token it has done.
     setupToken = typeof cfg.setupRequestedAt === 'string' ? cfg.setupRequestedAt : '';
     renderSetup();
 
-    // Stored routing layered over the defaults, so a config saved before this tab existed — or one
-    // missing a cell — still renders complete rules rather than blanks.
-    resetRouting();
+    routing = {};
     var stored = cfg.routing && typeof cfg.routing === 'object' ? cfg.routing : {};
     ROUTED_EVENTS.forEach(function (event) {
-      var cell = stored[event];
-      if (!cell || typeof cell !== 'object') return;
-      ['user', 'admin', 'adminInfo'].forEach(function (key) {
-        if (typeof cell[key] === 'boolean') routing[event][key] = cell[key];
-      });
-      if (!supportsAdminInfo(event)) routing[event].adminInfo = false;
+      var row = stored[event] && typeof stored[event] === 'object' ? stored[event] : {};
+      var base = DEFAULT_ROUTING[event];
+      routing[event] = {
+        user: typeof row.user === 'boolean' ? row.user : base.user,
+        admin: typeof row.admin === 'boolean' ? row.admin : base.admin,
+        adminInfo: typeof row.adminInfo === 'boolean' ? row.adminInfo : base.adminInfo
+      };
     });
     renderRouting();
+
     var mappings = Array.isArray(cfg.users) ? cfg.users : [];
     var byId = {};
     mappings.forEach(function (m) {
       if (m && m.seerrUserId !== undefined && m.seerrUserId !== null) byId[String(m.seerrUserId)] = m;
     });
 
-    // Configured ids the roster no longer knows about keep a row, flagged, so a deleted Seerr account
-    // or a not-yet-refreshed roster never silently discards a mapping on the next save.
     var known = {};
     roster.forEach(function (entry) { known[String(entry.id)] = true; });
     var orphans = mappings
       .filter(function (m) { return m && m.seerrUserId !== undefined && m.seerrUserId !== null && !known[String(m.seerrUserId)]; })
-      .map(function (m) { return { id: m.seerrUserId, name: m.username || '', email: m.email || '', isAdmin: m.isAdmin === true, missing: true }; });
+      .map(function (m) {
+        return { id: m.seerrUserId, name: m.username || '', email: m.email || '', isAdmin: m.isAdmin === true, missing: true };
+      });
 
     userRows.innerHTML = '';
     orphans.concat(roster).forEach(function (entry) {
-      userRows.appendChild(renderRow(entry, byId[String(entry.id)]));
+      userRows.appendChild(renderPerson(entry, byId[String(entry.id)]));
     });
-
-    var meta = el('rosterMeta');
-    if (roster.length === 0) {
-      meta.textContent = 'No Seerr accounts cached yet — hit Refresh from Seerr, then reload this page.';
-    } else {
-      var when = cfg.rosterSyncedAt ? String(cfg.rosterSyncedAt).replace('T', ' ').slice(0, 16) : 'unknown';
-      meta.textContent = roster.length + ' Seerr account(s), synced ' + when;
-    }
     refreshCounts();
     applyFilter();
   }
@@ -824,34 +1067,25 @@
     cfg.users = currentRows()
       .map(function (row) { return row.readMapping(); })
       .filter(function (m) { return m.enabled || m.number !== ''; });
-    // Written back verbatim: the editor never edits the roster, but dropping it here would erase the
-    // cache on the next save and blank the list until the next refresh.
+    // Written back verbatim: the editor never edits these, but dropping them here would erase the cache
+    // on the next save and blank the panel until the next refresh.
     cfg.seerrRoster = roster;
     cfg.rosterSyncedAt = rosterSyncedAt;
     cfg.rosterRefreshRequestedAt = refreshToken;
     cfg.routing = routing;
-    // Written back verbatim for the same reason as the roster: the plugin owns this key, and dropping it
-    // here would erase the ingress URLs and the update check on the next ordinary save.
     cfg.setup = setup;
     cfg.setupRequestedAt = setupToken;
     return cfg;
   }
 
-  // The editor has no network of its own, so "Refresh from Seerr" cannot fetch anything. It stamps a new
-  // token and saves: the plugin sees the changed token in onConfigChange, fetches the roster, and writes
-  // it back into config. The dashboard answers config:get from the plugin list the PAGE loaded with, so
-  // the new roster only appears after a reload — which is what the message below says.
+  // Refresh from Seerr cannot fetch anything either: it stamps a new token and saves. The plugin sees the
+  // changed token, fetches the roster, and writes it back.
   function requestRefresh() {
     refreshToken = new Date().toISOString();
     refreshBtn.disabled = true;
     saveBtn.disabled = true;
-    showFeedback('', true);
+    setStatus('Fetching your Seerr users…', true);
     parent.postMessage({ type: 'config:save', config: assembleConfig() }, '*');
-  }
-
-  function showFeedback(message, isOk) {
-    feedback.textContent = message;
-    feedback.className = isOk ? 'ok' : 'err';
   }
 
   // The host resolves 'system' for us, so this is only ever 'light' or 'dark'. Anything else (including
@@ -865,18 +1099,19 @@
   window.addEventListener('message', function (event) {
     var data = event.data;
     if (!data || typeof data.type !== 'string') return;
+
     if (data.type === 'config:value') {
       applyTheme(data.theme);
       populateConfig(data.config);
       if (pending) {
         // `lastAction` echoes the token that produced this state, so it is the one unambiguous signal
-        // that what we are looking at is the answer to THIS click and not the state before it.
+        // that what we are looking at answers THIS press and not the state before it.
         var landed = setup && setup.lastAction === pending.token;
         if (landed && setup.error) {
-          showFeedback(setup.error, false);
+          setStatus(setup.error, false);
           finishSetup();
         } else if (landed) {
-          showFeedback(setupDone(pending.action), true);
+          setStatus(setupDone(pending.action), true);
           finishSetup();
         } else {
           waitForSetupResult();
@@ -890,19 +1125,18 @@
         // refetch, so give it a moment before asking for the value.
         setTimeout(function () { parent.postMessage({ type: 'config:get' }, '*'); }, 700);
       } else if (refreshBtn.disabled) {
-        showFeedback('Fetching from Seerr… reload this page in a few seconds to see the list.', true);
+        setStatus('Fetching from Seerr… reload this page in a few seconds to see the list.', true);
         refreshBtn.disabled = false;
         saveBtn.disabled = false;
       } else {
-        showFeedback('Saved.', true);
-        refreshBtn.disabled = false;
+        setStatus('Saved.', true);
         saveBtn.disabled = false;
       }
     } else if (data.type === 'config:error') {
       if (pending) finishSetup();
       refreshBtn.disabled = false;
-      showFeedback(data.message || 'Save failed.', false);
       saveBtn.disabled = false;
+      setStatus(data.message || 'Save failed — nothing was written.', false);
     }
   });
 
@@ -910,54 +1144,48 @@
     var cfg = assembleConfig();
     var live = cfg.users.filter(function (m) { return m.enabled && m.number !== ''; });
     saveBtn.disabled = true;
-    showFeedback('', true);
+    setStatus('Saving…', true);
     parent.postMessage({ type: 'config:save', config: cfg }, '*');
-    // Saved either way — a first-run operator has to save the Seerr URL before a roster refresh can find
-    // anyone to map, so this is a warning about what will not be delivered yet, not a refusal.
+    // Saved either way — a first-run operator has to save a Seerr URL before a roster refresh can find
+    // anyone to map, so this warns about what will not be delivered yet rather than refusing.
     if (live.length === 0) {
-      showFeedback('Saved. Nothing can be delivered yet: enable a recipient and give them a WhatsApp number.', false);
+      setStatus('Saved. Nothing can be delivered yet — tick a recipient and give them a WhatsApp number.', false);
     }
   });
 
   el('userFilter').addEventListener('input', applyFilter);
-  el('enabledOnly').addEventListener('change', applyFilter);
+  el('enabledOnly').addEventListener('click', function () {
+    var on = el('enabledOnly').getAttribute('aria-pressed') === 'true';
+    el('enabledOnly').setAttribute('aria-pressed', on ? 'false' : 'true');
+    applyFilter();
+  });
   refreshBtn.addEventListener('click', requestRefresh);
   el('routingReset').addEventListener('click', resetRouting);
 
-  // ── Setup tab wiring ────────────────────────────────────────────────────
+  el('copyUrl').addEventListener('click', function () {
+    copyText(el('webhookUrl').value, el('copyUrl'), el('webhookUrl'));
+  });
   el('copySecret').addEventListener('click', function () {
     copyText(el('ingressSecret').value, el('copySecret'), el('ingressSecret'));
   });
-
-  // Clearing is the one part of `setup` the editor writes itself: it is a plain field edit followed by an
-  // ordinary save, with no plugin round trip and nothing to wait for.
-  el('clearSecret').addEventListener('click', function () {
-    setup.secret = '';
-    renderSetup();
-    saveBtn.disabled = true;
-    parent.postMessage({ type: 'config:save', config: assembleConfig() }, '*');
-    showFeedback('Secret cleared from the plugin config.', true);
+  el('revealSecret').addEventListener('click', function () {
+    var field = el('ingressSecret');
+    var button = el('revealSecret');
+    var shown = field.type === 'text';
+    field.type = shown ? 'password' : 'text';
+    button.setAttribute('aria-pressed', shown ? 'false' : 'true');
+    button.setAttribute('aria-label', shown ? 'Show the secret' : 'Hide the secret');
+    button.replaceChild(icon(shown ? 'i-eye' : 'i-eye-off'), button.firstChild);
   });
-
   el('checkUpdate').addEventListener('click', function () {
     requestSetup('update', '', 'Asking GitHub for the latest release…');
   });
+  el('repoLink').addEventListener('click', function (event) { openExternal(event, el('repoLink').href); });
+  el('updateLink').addEventListener('click', function (event) { openExternal(event, el('updateLink').href); });
 
-  el('copyUrl').addEventListener('click', function () {
-    copyText(el('webhookUrl').textContent, el('copyUrl'));
-  });
-
-  el('copyRepo').addEventListener('click', function () {
-    copyText(el('repoUrl').textContent, el('copyRepo'));
-  });
-
-  el('copyUpdateUrl').addEventListener('click', function () {
-    copyText(el('updateUrl').textContent, el('copyUpdateUrl'));
-  });
-
-  // Two clicks, because this breaks a working webhook until the new value reaches Seerr — and because a
-  // sandboxed frame has no confirm() to fall back on (modals need allow-modals, which it is not given).
-  var armed = null;
+  // Two presses: generating breaks a working webhook until the new value reaches Seerr, and a sandboxed
+  // frame has no confirm() to fall back on (modals need allow-modals, which it is not given).
+  var armedInstance = null;
   el('generateSecret').addEventListener('click', function () {
     var button = el('generateSecret');
     var picker = el('secretInstance');
@@ -965,25 +1193,25 @@
     var target = picker.hidden ? (instances[0] || {}).instanceId : picker.value;
     if (!target) return;
 
-    if (armed !== target) {
-      armed = target;
+    if (armedInstance !== target) {
+      armedInstance = target;
       button.classList.add('armed');
-      button.textContent = 'Replace the secret for "' + target + '"?';
+      button.setAttribute('aria-label', 'Press again to replace the secret for ' + target);
       el('secretWarning').hidden = false;
-      // Disarm on its own, so an armed button left alone cannot be triggered by a stray later click.
+      setStatus('Press ↻ again to replace the secret for ' + target + '.', false);
       setTimeout(function () {
-        if (armed !== target) return;
-        armed = null;
+        if (armedInstance !== target) return;
+        armedInstance = null;
         button.classList.remove('armed');
-        button.textContent = 'Generate a new secret';
+        button.setAttribute('aria-label', 'Generate a new secret');
         el('secretWarning').hidden = true;
       }, 10000);
       return;
     }
 
-    armed = null;
+    armedInstance = null;
     button.classList.remove('armed');
-    button.textContent = 'Generate a new secret';
+    button.setAttribute('aria-label', 'Generate a new secret');
     el('secretWarning').hidden = true;
     requestSetup('secret', target, 'Generating a new secret…');
   });

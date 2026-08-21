@@ -1,7 +1,7 @@
 {
   "id": "seerr-notify",
   "name": "Seerr Notifications",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "type": "extension",
   "main": "dist/index.js",
   "description": "Deliver Overseerr/Jellyseerr request and issue notifications over WhatsApp, formatted per recipient.",
@@ -70,7 +70,7 @@
   ],
   "configUi": {
     "entry": "config/index.html",
-    "height": 700
+    "height": 640
   },
   "configSchema": {
     "type": "object",

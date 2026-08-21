@@ -243,3 +243,35 @@ test('the editor names the header the manifest actually verifies', () => {
   const rig = readFileSync(join(HERE, 'send-test.mjs'), 'utf8');
   assert.match(rig, /Authorization: TOKEN/, 'send-test.mjs would 401 against the declared header');
 });
+
+test('the editor keeps the interface rules that silently regress', () => {
+  // Nothing compiles this file, so these are the rules that break without anyone noticing. Checked
+  // against the Web Interface Guidelines the rewrite was reviewed with.
+  const markup = html.split('<script>')[0];
+  const css = markup.split('</style>')[0];
+  const problems: string[] = [];
+
+  // An `outline: none` on :focus outranks a zero-specificity :where(…):focus-visible ring, so keyboard
+  // focus disappears on exactly the controls that most need it.
+  for (const rule of css.matchAll(/([^{}]+)\{[^}]*outline:\s*none/g)) {
+    if (!rule[1].includes(':not(:focus-visible)')) problems.push(`unscoped outline:none → ${rule[1].trim()}`);
+  }
+  // An icon-only button has no accessible name unless it is given one.
+  for (const button of markup.matchAll(/<button(?![^>]*aria-label)[^>]*class="icon"[^>]*>\s*<svg/g)) {
+    problems.push(`icon-only button without aria-label at index ${button.index}`);
+  }
+  for (const svg of markup.matchAll(/<svg(?![^>]*aria-hidden)[^>]*>/g)) {
+    problems.push(`decorative svg without aria-hidden at index ${svg.index}`);
+  }
+  // A placeholder shows the shape of the value; it is not a second label or an instruction.
+  for (const placeholder of markup.matchAll(/placeholder="([^"]*)"/g)) {
+    if (!placeholder[1].endsWith('…')) problems.push(`placeholder without an ellipsis: ${placeholder[1]}`);
+  }
+  if (/transition:\s*all/.test(css)) problems.push('transition: all — list the properties');
+  if (/\.\.\./.test(markup)) problems.push('literal ... — use …');
+  if (/(?<=[A-Za-z])'(?=[A-Za-z])/.test(markup)) problems.push('straight apostrophe — use ’');
+  if (!/aria-live="polite"/.test(markup)) problems.push('the status line must announce itself');
+  if (!/color-scheme:\s*dark/.test(css)) problems.push('dark theme needs color-scheme for native controls');
+
+  assert.deepEqual(problems, []);
+});

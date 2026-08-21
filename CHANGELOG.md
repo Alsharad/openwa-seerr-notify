@@ -6,6 +6,36 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-08-21
+
+### Changed
+
+- **The config panel is rebuilt.** One component vocabulary now runs through every tab, so Connection,
+  Recipients, Who gets what, Options and Setup are visibly the same product:
+  - **The rail** — `[label] [value] [actions]` in a recessed row — carries the webhook URL, the secret,
+    the recipient filter and the create-instance command. Modelled on Seerr’s own API-key control, which
+    is what the operator has open in the next tab.
+  - The secret behaves like Seerr’s API key: masked by default, with reveal, copy and regenerate icons.
+    **The Clear button is gone** — Seerr stores it in the clear anyway, and clearing it here only meant
+    generating a new one to see it again.
+  - Every machine value — URLs, secrets, event names, Seerr ids, phone numbers — is set in mono with
+    tabular figures, so the routing matrix and the recipient list scan as columns.
+  - Icons are one inline SVG set (the frame’s CSP allows no external image or font requests).
+- **The webhook URL no longer grows a scrollbar.** It truncates with an ellipsis, carries the full value
+  in its tooltip, and Copy takes the whole thing.
+- **The full guide is a link**, not a field to copy from. A sandboxed frame has no `allow-popups`, so the
+  click tries `window.open` and falls back to putting the URL on the clipboard rather than doing nothing.
+- Recipient rows show a live count (“3 of 25 will be notified”), and clearing one takes two presses,
+  since a cleared mapping cannot be recovered from the panel.
+
+### Fixed
+
+- Keyboard focus was invisible on every text input: an `outline: none` on `:focus` outranked the
+  zero-specificity `:focus-visible` ring. Scoped to pointer focus only.
+- Tabs are now arrow-key navigable, panels are focusable, icon-only buttons carry `aria-label`, the
+  status line announces itself (`aria-live`), and the dark theme sets `color-scheme` so native controls
+  and scrollbars match.
+
 ## [1.6.0] — 2026-08-21
 
 ### Added

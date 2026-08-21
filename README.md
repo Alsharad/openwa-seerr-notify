@@ -100,7 +100,8 @@ The full path:
    and it works before any recipient exists.
 6. **Configure → Setup** now shows the webhook URL to paste into Seerr. If you did not keep the secret
    from step 4, press **Generate a new secret** (twice — it asks) and copy the value that appears a
-   second later. Clear it once Seerr has it.
+   second later — masked by default, with reveal, copy and regenerate icons, the same way Seerr shows
+   its own API key.
 7. **Point Seerr at it** — Jellyseerr/Overseerr → Settings → Notifications → Webhook:
    - **Enable Agent**: on
    - **Webhook URL**: the URL from the Setup tab
@@ -211,12 +212,12 @@ are listed because they are what the REST API and any backup will show you.
 | `updateCheckEnabled` | no | `true` | Ask GitHub once a day whether a newer release exists. Off = no outbound request is ever made. |
 | `debug` | no | `false` | Log one line per delivery with masked chat ids. Never logs message bodies. |
 
-`setup.secret` holds the plaintext ingress secret from the last **Generate a new secret**, until you
-clear it. That is deliberate and it is the only way the value can reach you: the gateway reveals an
-ingress secret exactly once, in the response to the call that mints it, and a config field flagged
-`secret` arrives at the config screen as `***`. It is the credential for one ingress route, readable only
-by an admin API key — the same key class that could rotate it anyway. Copy it into Seerr and press
-**Clear**.
+`setup.secret` holds the plaintext ingress secret from the last **Generate**. That is deliberate, and it
+is the only way the value can reach you: the gateway reveals an ingress secret exactly once, in the
+response to the call that mints it, and a config field flagged `secret` arrives at the config screen as
+`***`. It is the credential for one ingress route, readable only by an admin API key — the same key class
+that could rotate it anyway — and Seerr stores its copy in the clear regardless. Rotate it with the
+regenerate icon if it leaks.
 
 Every **Now Available** section — overview, rating, runtime, genres, director/creator, top cast, trailer,
 seasons, collection — is always on. These were nine separate toggles until v1.2.0; that was more
