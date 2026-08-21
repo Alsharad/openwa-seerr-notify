@@ -160,8 +160,10 @@ it, so it is worth understanding rather than switching off wholesale: `WEBHOOK_S
 disables the guard for **every** plugin on the host, while `SSRF_ALLOWED_HOSTS` opens exactly the one
 address you named.
 
-Some OpenWA builds do not enforce this and reach a LAN address without the variable. Either way the
-health check tells you which one you have.
+Note that OpenWA reads this from its own `.env` (`/app/data/.env.generated` in the standard container)
+as well as the process environment, so `docker inspect` showing no such variable does not mean it is
+unset. The health check is the reliable answer: if it reports the Seerr version, the guard is letting
+the call through.
 
 **Why `net.allow` is `["*"]`** and not a host list: the host only auto-admits a config URL through
 `net.allowConfigHosts` when it is **https** (OpenWA's own `plugin-net.ts`, `effectiveNetAllow`), and a

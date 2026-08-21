@@ -22,6 +22,22 @@ All notable changes to this plugin are documented here. The format follows
 - Removed the instruction to reload the page after Refresh from Seerr; the list has repainted in place
   since 1.9.0. Host placeholders read `<openwa-host>:<openwa-port>` everywhere, matching the panel.
 
+## [1.15.3] — 2026-08-21
+
+### Documentation
+
+- **Corrected a wrong claim in *Reaching a self-hosted Seerr*.** It said some OpenWA builds do not enforce
+  the SSRF guard and reach a LAN address without `SSRF_ALLOWED_HOSTS`. They do enforce it — the guard has
+  applied to `ctx.net.fetch` since the capability was introduced, and nothing in OpenWA's changelog
+  changes that between 0.23.0 and 0.23.1.
+
+  The reasoning behind the claim was faulty: a gateway that reached a LAN Seerr with no such variable in
+  `docker inspect`. OpenWA also reads its own `.env` — `/app/data/.env.generated` in the standard
+  container — and the variable was set there. `docker inspect` showing nothing is not evidence it is
+  unset, and the section now says so.
+
+  The behaviour is therefore uniform: a private Seerr address needs `SSRF_ALLOWED_HOSTS` on every build.
+
 ## [1.15.2] — 2026-08-21
 
 ### Fixed
