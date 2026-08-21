@@ -1,0 +1,190 @@
+{
+  "id": "seerr-notify",
+  "name": "Seerr Notifications",
+  "version": "1.5.0",
+  "type": "extension",
+  "main": "dist/index.js",
+  "description": "Deliver Overseerr/Jellyseerr request and issue notifications over WhatsApp, formatted per recipient.",
+  "author": "gunslingerkw",
+  "license": "MIT",
+  "homepage": "https://github.com/Alsharad/openwa-seerr-notify",
+  "repository": "https://github.com/Alsharad/openwa-seerr-notify",
+  "keywords": [
+    "overseerr",
+    "jellyseerr",
+    "seerr",
+    "notifications",
+    "media",
+    "plex",
+    "jellyfin",
+    "openwa"
+  ],
+  "status": "beta",
+  "minOpenWAVersion": "0.8.16",
+  "testedOpenWAVersion": "0.23.1",
+  "sdkVersion": "1",
+  "permissions": [
+    "webhook:ingress",
+    "conversation:send",
+    "net:fetch",
+    "storage:use"
+  ],
+  "sessionScoped": true,
+  "sessions": [
+    "*"
+  ],
+  "net": {
+    "allow": [],
+    "allowConfigHosts": [
+      "jellyseerrUrl"
+    ]
+  },
+  "ingress": [
+    {
+      "route": "seerr",
+      "mode": "async",
+      "verify": "core",
+      "maxBodyBytes": 262144,
+      "signature": {
+        "scheme": "shared-secret",
+        "header": "X-Seerr-Token"
+      },
+      "response": {
+        "preflight": [
+          {
+            "type": "session-alive"
+          }
+        ],
+        "ack": {
+          "status": 200,
+          "headers": {
+            "content-type": "application/json"
+          },
+          "body": "{\"ok\":true}"
+        },
+        "deadlineMs": 5000
+      }
+    }
+  ],
+  "configUi": {
+    "entry": "config/index.html",
+    "height": 620
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "jellyseerrUrl": {
+        "type": "string",
+        "title": "Jellyseerr / Overseerr URL",
+        "description": "Base URL, e.g. http://192.168.1.50:5055. Enrichment is skipped when empty. A private-network host also needs the manifest net.allow entry and SSRF_ALLOWED_HOSTS — see the README.",
+        "default": ""
+      },
+      "jellyseerrApiKey": {
+        "type": "string",
+        "title": "Seerr API key",
+        "description": "Used to enrich notifications with media details, ratings and requester identity.",
+        "secret": true,
+        "default": ""
+      },
+      "enrichmentEnabled": {
+        "type": "boolean",
+        "title": "Enable Seerr API enrichment",
+        "description": "Off = format from the webhook payload alone: no overview, ratings, cast, genres or season list.",
+        "default": true
+      },
+      "requireMappedUser": {
+        "type": "boolean",
+        "title": "Require a mapped user",
+        "description": "On = an event resolving to no recipient is recorded as a dead letter instead of being dropped quietly.",
+        "default": true
+      },
+      "fallbackSessionId": {
+        "type": "string",
+        "title": "Fallback WhatsApp session",
+        "description": "Session to send from when the ingress instance is not bound to one. Either bind the instance to a session or set this, otherwise nothing can be delivered.",
+        "default": ""
+      },
+      "users": {
+        "type": "array",
+        "title": "Recipient mappings",
+        "description": "One entry per notified Seerr user. Managed from the Recipients tab; identity and admin status come from the cached roster, not from here.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "seerrUserId": {
+              "type": "number",
+              "title": "Seerr user ID"
+            },
+            "number": {
+              "type": "string",
+              "title": "WhatsApp number"
+            },
+            "enabled": {
+              "type": "boolean",
+              "title": "Enabled",
+              "default": true
+            }
+          }
+        },
+        "default": []
+      },
+      "sendPoster": {
+        "type": "boolean",
+        "title": "Send poster image",
+        "description": "Attach the poster to Now Available / Request Submitted notifications.",
+        "default": true
+      },
+      "debug": {
+        "type": "boolean",
+        "title": "Debug mode",
+        "description": "Log each delivery: event type, resolved recipient count, masked chat ids and send outcomes. Never logs message bodies.",
+        "default": false
+      },
+      "seerrRoster": {
+        "type": "array",
+        "title": "Seerr roster (cached)",
+        "description": "Seerr accounts cached by refresh-roster.mjs so the config editor can list them. Not edited by hand — the editor has no network of its own.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "number",
+              "title": "Seerr user ID"
+            },
+            "name": {
+              "type": "string",
+              "title": "Display name"
+            },
+            "email": {
+              "type": "string",
+              "title": "Email"
+            },
+            "isAdmin": {
+              "type": "boolean",
+              "title": "Seerr admin",
+              "default": false
+            }
+          }
+        },
+        "default": []
+      },
+      "rosterSyncedAt": {
+        "type": "string",
+        "title": "Roster last synced",
+        "description": "ISO timestamp written by refresh-roster.mjs.",
+        "default": ""
+      },
+      "rosterRefreshRequestedAt": {
+        "type": "string",
+        "title": "Roster refresh token",
+        "description": "Stamped by the Refresh from Seerr button. Changing it is what asks the plugin to refetch the roster; it is not edited by hand.",
+        "default": ""
+      },
+      "routing": {
+        "type": "object",
+        "title": "Per-event routing",
+        "description": "Who receives each Seerr event, and whether admins get the Admin Info block. Managed from the Who gets what tab; unset events fall back to the plugin defaults."
+      }
+    }
+  }
+}

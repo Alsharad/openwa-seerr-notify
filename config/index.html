@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Seerr Notifications</title>
+<style>
+  /* Colour lives in custom properties so the dark theme is a variable swap rather than a second
+     stylesheet. The host resolves its theme and sends it with the config handshake
+     (config:value.theme) because this editor runs in an opaque-origin sandbox and cannot read the
+     dashboard's theme itself. Falls back to the OS preference when the host says nothing. */
+  :root {
+    --bg: #ffffff;
+    --fg: #1f2937;
+    --muted: #6b7280;
+    --border: #d1d5db;
+    --panel: #f9fafb;
+    --accent: #16a34a;
+    --accent-fg: #ffffff;
+    --danger: #dc2626;
+    --ok: #15803d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1e293b; --fg: #e2e8f0; --muted: #94a3b8; --border: #334155;
+      --panel: #0f172a; --accent: #22c55e; --accent-fg: #052e16; --danger: #f87171; --ok: #4ade80;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1e293b; --fg: #e2e8f0; --muted: #94a3b8; --border: #334155;
+    --panel: #0f172a; --accent: #22c55e; --accent-fg: #052e16; --danger: #f87171; --ok: #4ade80;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px;
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--fg);
+  }
+  h2 { font-size: 15px; margin: 0 0 4px; }
+  p.hint { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap; }
+  .tabs button {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--muted); font: inherit; padding: 8px 12px; cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
+  section[hidden] { display: none; }
+
+  label { display: block; font-weight: 600; margin-bottom: 4px; }
+  .field { margin-bottom: 16px; }
+  .field small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+  input[type="text"], input[type="password"], input[type="number"] {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--panel); color: var(--fg); font: inherit;
+  }
+  .check { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 14px; }
+  .check input { margin-top: 3px; }
+  .check label { font-weight: 600; margin: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  td.mark, th.mark { text-align: center; width: 90px; }
+  .yes { color: var(--ok); font-weight: 700; }
+  .no { color: var(--muted); }
+  td.mark.toggle { cursor: pointer; user-select: none; }
+  td.mark.toggle:hover { background: var(--panel); }
+  td.mark.na { color: var(--border); cursor: default; }
+  button.linkish {
+    background: none; border: none; padding: 0; font: inherit; font-size: 12px;
+    color: var(--accent); text-decoration: underline; cursor: pointer;
+  }
+
+  .roster-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 8px 10px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); font-size: 12px; color: var(--muted);
+  }
+  .roster-bar code { font-size: 11px; }
+  .badge {
+    display: inline-block; padding: 1px 6px; border-radius: 999px; font-size: 10px; font-weight: 700;
+    letter-spacing: .04em; background: var(--accent); color: var(--accent-fg);
+  }
+  .badge.gone { background: var(--danger); color: #fff; }
+  .who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .who b { font-weight: 600; }
+  .who span { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+  .rows { display: flex; flex-direction: column; gap: 8px; }
+  .row {
+    display: grid; gap: 10px; align-items: center; padding: 6px 10px;
+    grid-template-columns: auto minmax(0, 1fr) 56px 170px auto;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .row.off { opacity: .5; }
+  .row[hidden] { display: none; }
+  .row .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .meta { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row input[type="text"] { padding: 5px 8px; font-size: 13px; }
+  .row .del {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 15px; line-height: 1; padding: 4px 6px; border-radius: 5px;
+  }
+  .row .del:hover { color: var(--danger); }
+  .filters { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .filters input[type="search"] {
+    flex: 1 1 200px; min-width: 160px; padding: 7px 10px; font: inherit; font-size: 13px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--fg);
+  }
+  .filters label { display: flex; align-items: center; gap: 6px; font-weight: 400; font-size: 12px; color: var(--muted); margin: 0; }
+  .row .col { display: flex; flex-direction: column; gap: 3px; }
+  .row .col span { font-size: 11px; color: var(--muted); }
+  .row .adm { display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
+  @media (max-width: 560px) { .row { grid-template-columns: auto 1fr auto; } .row .meta { display: none; } }
+
+  button.action {
+    background: var(--accent); color: var(--accent-fg); border: none; border-radius: 6px;
+    padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button.ghost { background: none; color: var(--fg); border: 1px solid var(--border); }
+  button.remove { background: none; border: 1px solid var(--border); color: var(--danger); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  .bar { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+  #feedback { font-size: 13px; }
+  #feedback.ok { color: var(--ok); }
+  #feedback.err { color: var(--danger); }
+</style>
+</head>
+<body>
+
+<div class="tabs" role="tablist">
+  <button role="tab" id="tab-connection" aria-controls="panel-connection" aria-selected="true">Connection</button>
+  <button role="tab" id="tab-recipients" aria-controls="panel-recipients" aria-selected="false">Recipients</button>
+  <button role="tab" id="tab-routing" aria-controls="panel-routing" aria-selected="false">Who gets what</button>
+  <button role="tab" id="tab-options" aria-controls="panel-options" aria-selected="false">Options</button>
+</div>
+
+<section id="panel-connection" role="tabpanel" aria-labelledby="tab-connection">
+  <h2>Seerr connection</h2>
+  <p class="hint">Used to enrich notifications with overview, ratings, cast and season status. Leave blank to format from the webhook payload alone. Use the health-check button on the plugin row to test these settings.</p>
+  <div class="field">
+    <label for="jellyseerrUrl">Jellyseerr / Overseerr URL</label>
+    <input type="text" id="jellyseerrUrl" placeholder="http://192.168.1.50:5055" />
+    <small>A private-network host also needs the manifest <code>net.allow</code> entry and <code>SSRF_ALLOWED_HOSTS</code>.</small>
+  </div>
+  <div class="field">
+    <label for="jellyseerrApiKey">Seerr API key</label>
+    <input type="password" id="jellyseerrApiKey" autocomplete="off" />
+    <small>Stored masked. Leave the masked value untouched to keep the saved key.</small>
+  </div>
+  <div class="check">
+    <input type="checkbox" id="enrichmentEnabled" />
+    <div>
+      <label for="enrichmentEnabled">Enable Seerr API enrichment</label>
+      <small>Off = send from the webhook payload alone.</small>
+    </div>
+  </div>
+</section>
+
+<section id="panel-recipients" role="tabpanel" aria-labelledby="tab-recipients" hidden>
+  <h2>Recipients</h2>
+  <p class="hint">
+    Every account from your Seerr instance. Tick someone and give them a WhatsApp number to start
+    notifying them. Names, emails and admin status come from Seerr and are not editable here.
+  </p>
+  <div class="roster-bar">
+    <span id="rosterMeta"></span>
+    <button type="button" class="action ghost" id="refreshRoster">Refresh from Seerr</button>
+  </div>
+  <div class="filters">
+    <input type="search" id="userFilter" placeholder="Filter by name, email or id…" />
+    <label><input type="checkbox" id="enabledOnly" /> Enabled only</label>
+  </div>
+  <div class="rows" id="userRows"></div>
+</section>
+
+<section id="panel-routing" role="tabpanel" aria-labelledby="tab-routing" hidden>
+  <h2>Who gets what</h2>
+  <p class="hint">
+    Click any cell to flip it. <strong>Requester / reporter</strong> is the mapped user behind the event;
+    <strong>admins</strong> is every enabled recipient Seerr marks as an admin. Someone who is both gets
+    one message — the admin one. <button type="button" class="linkish" id="routingReset">Reset to defaults</button>
+  </p>
+  <table id="routingTable">
+    <thead>
+      <tr>
+        <th>Seerr event</th>
+        <th class="mark">Requester<br />/ reporter</th>
+        <th class="mark">Admins</th>
+        <th class="mark">Admin Info<br />section</th>
+      </tr>
+    </thead>
+    <tbody id="routingBody"></tbody>
+  </table>
+  <p class="hint" id="adminCount" style="margin-top: 14px;"></p>
+</section>
+
+<section id="panel-options" role="tabpanel" aria-labelledby="tab-options" hidden>
+  <h2>Options</h2>
+  <div class="check">
+    <input type="checkbox" id="sendPoster" />
+    <div>
+      <label for="sendPoster">Send poster image</label>
+      <small>Attached to Now Available and Request Submitted. Sent as the caption when the message fits WhatsApp's 1024-character limit, otherwise as its own image followed by the text.</small>
+    </div>
+  </div>
+  <div class="check">
+    <input type="checkbox" id="requireMappedUser" />
+    <div>
+      <label for="requireMappedUser">Require a mapped user</label>
+      <small>On: an event matching nobody is recorded as a delivery failure. Off: dropped quietly.</small>
+    </div>
+  </div>
+  <div class="check">
+    <input type="checkbox" id="debug" />
+    <div>
+      <label for="debug">Debug mode</label>
+      <small>Log each delivery: event type, recipient count, masked chat ids, send outcomes. Never logs message bodies.</small>
+    </div>
+  </div>
+  <div class="field">
+    <label for="fallbackSessionId">Fallback WhatsApp session</label>
+    <input type="text" id="fallbackSessionId" placeholder="(optional)" />
+    <small>Used when the ingress instance is not bound to a session.</small>
+  </div>
+</section>
+
+<div class="bar">
+  <button type="button" class="action" id="save">Save configuration</button>
+  <span id="feedback"></span>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var SCALARS = ['jellyseerrUrl', 'jellyseerrApiKey', 'fallbackSessionId'];
+  var BOOLEANS = ['enrichmentEnabled', 'requireMappedUser', 'sendPoster', 'debug'];
+
+  var el = function (id) { return document.getElementById(id); };
+  var saveBtn = el('save');
+  var refreshBtn = el('refreshRoster');
+  var feedback = el('feedback');
+  var userRows = el('userRows');
+  /** Round-tripped unchanged on an ordinary save; re-stamped only by "Refresh from Seerr". */
+  var refreshToken = '';
+
+  // ── Tabs ────────────────────────────────────────────────────────────────
+  var tabs = [].slice.call(document.querySelectorAll('[role="tab"]'));
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      tabs.forEach(function (other) {
+        var selected = other === tab;
+        other.setAttribute('aria-selected', selected ? 'true' : 'false');
+        el(other.getAttribute('aria-controls')).hidden = !selected;
+      });
+    });
+  });
+
+  // ── Routing ─────────────────────────────────────────────────────────────
+  // Mirrors DEFAULT_ROUTING in routing.ts. config-ui.test.ts parses this block and fails if the two
+  // disagree, so the editor cannot start offering defaults the plugin does not actually apply.
+  var DEFAULT_ROUTING = {
+    MEDIA_PENDING:        { user: true,  admin: true,  adminInfo: true  },
+    MEDIA_APPROVED:       { user: true,  admin: true,  adminInfo: true  },
+    MEDIA_DECLINED:       { user: true,  admin: true,  adminInfo: true  },
+    MEDIA_FAILED:         { user: true,  admin: true,  adminInfo: true  },
+    MEDIA_AVAILABLE:      { user: true,  admin: false, adminInfo: false },
+    MEDIA_AUTO_APPROVED:  { user: true,  admin: false, adminInfo: false },
+    MEDIA_AUTO_REQUESTED: { user: true,  admin: false, adminInfo: false },
+    ISSUE_CREATED:        { user: true,  admin: true,  adminInfo: true  },
+    ISSUE_COMMENT:        { user: true,  admin: true,  adminInfo: true  },
+    ISSUE_RESOLVED:       { user: true,  admin: true,  adminInfo: true  },
+    ISSUE_REOPENED:       { user: true,  admin: true,  adminInfo: true  },
+    TEST_NOTIFICATION:    { user: false, admin: true,  adminInfo: false }
+  };
+  var ROUTED_EVENTS = Object.keys(DEFAULT_ROUTING);
+  /** A test carries no requester and no ids, so an Admin Info block would be an empty heading. */
+  function supportsAdminInfo(event) { return event !== 'TEST_NOTIFICATION'; }
+
+  var routing = {};
+
+  function renderRouting() {
+    var body = el('routingBody');
+    body.innerHTML = '';
+
+    ROUTED_EVENTS.forEach(function (event) {
+      var cells = routing[event] || DEFAULT_ROUTING[event];
+      var tr = document.createElement('tr');
+      tr.setAttribute('data-event', event);
+
+      var label = document.createElement('td');
+      var code = document.createElement('code');
+      code.textContent = event;
+      label.appendChild(code);
+      tr.appendChild(label);
+
+      ['user', 'admin', 'adminInfo'].forEach(function (key) {
+        var td = document.createElement('td');
+        var applicable = key !== 'adminInfo' || supportsAdminInfo(event);
+
+        if (!applicable) {
+          td.className = 'mark na';
+          td.textContent = '—';
+          td.title = 'This event has nothing to put in an Admin Info block';
+        } else {
+          td.className = 'mark toggle ' + (cells[key] ? 'yes' : 'no');
+          td.textContent = cells[key] ? '✓' : '—';
+          td.title = 'Click to flip';
+          td.addEventListener('click', function () {
+            routing[event][key] = !routing[event][key];
+            renderRouting();
+          });
+        }
+        tr.appendChild(td);
+      });
+
+      body.appendChild(tr);
+    });
+  }
+
+  function resetRouting() {
+    routing = {};
+    ROUTED_EVENTS.forEach(function (event) {
+      routing[event] = {
+        user: DEFAULT_ROUTING[event].user,
+        admin: DEFAULT_ROUTING[event].admin,
+        adminInfo: DEFAULT_ROUTING[event].adminInfo
+      };
+    });
+    renderRouting();
+  }
+
+  // ── Recipients ──────────────────────────────────────────────────────────
+  // One row per Seerr account, from the roster cached in config by refresh-roster.mjs. The editor is an
+  // opaque-origin sandbox with no network, so it cannot fetch Seerr itself — the roster arrives with
+  // config:value or not at all. Rows whose id is absent from the roster are still rendered (they were
+  // configured before the account was deleted, or before the first refresh) so a mapping is never
+  // silently dropped by a stale roster.
+  var roster = [];
+  var rosterSyncedAt = '';
+
+  function renderRow(entry, mapping) {
+    var row = document.createElement('div');
+    row.className = 'row';
+
+    var enabled = document.createElement('input');
+    enabled.type = 'checkbox';
+    enabled.checked = mapping ? mapping.enabled !== false : false;
+    enabled.title = 'Notify this user';
+
+    var name = document.createElement('div');
+    name.className = 'name';
+    name.appendChild(document.createTextNode(entry.name || ('Seerr user ' + entry.id)));
+    if (entry.isAdmin) { name.appendChild(document.createTextNode(' ')); name.appendChild(badge('ADMIN', '')); }
+    // Only meaningful once a roster exists: with none cached, EVERY row would be flagged, which reads
+    // as data loss rather than "you have not run the refresh yet".
+    if (entry.missing && roster.length > 0) { name.appendChild(document.createTextNode(' ')); name.appendChild(badge('NOT IN SEERR', 'gone')); }
+
+    var meta = document.createElement('div');
+    meta.className = 'meta';
+    // Email stays in the roster (identityFor falls back to it, and the filter still searches it) but is
+    // not rendered — 24 addresses is clutter, not information.
+    meta.textContent = 'id ' + entry.id;
+
+    var phone = document.createElement('input');
+    phone.type = 'text';
+    phone.placeholder = '+96512345678';
+    phone.value = mapping && mapping.number ? String(mapping.number) : '';
+
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.textContent = '✕';
+    del.title = 'Clear this mapping';
+    del.addEventListener('click', function () {
+      // A Seerr account cannot be deleted from here — clearing its mapping is what "delete" means. A
+      // row that is no longer in Seerr has nothing to fall back to, so that one is removed outright.
+      if (entry.missing) {
+        row.parentNode.removeChild(row);
+      } else {
+        enabled.checked = false;
+        phone.value = '';
+        sync();
+      }
+      refreshCounts();
+    });
+
+    function sync() { row.className = enabled.checked ? 'row' : 'row off'; }
+    enabled.addEventListener('change', function () { sync(); refreshCounts(); });
+    phone.addEventListener('input', refreshCounts);
+    sync();
+
+    row.appendChild(enabled);
+    row.appendChild(name);
+    row.appendChild(meta);
+    row.appendChild(phone);
+    row.appendChild(del);
+
+    row.readMapping = function () {
+      return { seerrUserId: entry.id, number: phone.value.trim(), enabled: enabled.checked };
+    };
+    row.isAdmin = function () { return entry.isAdmin === true; };
+    row.isLive = function () { return enabled.checked && phone.value.trim() !== ''; };
+    row.matches = function (needle) {
+      if (!needle) return true;
+      return (String(entry.name || '') + ' ' + String(entry.email || '') + ' ' + entry.id).toLowerCase().indexOf(needle) !== -1;
+    };
+    return row;
+  }
+
+  function badge(text, extra) {
+    var span = document.createElement('span');
+    span.className = extra ? 'badge ' + extra : 'badge';
+    span.textContent = text;
+    return span;
+  }
+
+  function applyFilter() {
+    var needle = el('userFilter').value.trim().toLowerCase();
+    var onlyEnabled = el('enabledOnly').checked;
+    currentRows().forEach(function (row) {
+      row.hidden = !(row.matches(needle) && (!onlyEnabled || row.isLive()));
+    });
+  }
+
+  function currentRows() {
+    return [].slice.call(userRows.querySelectorAll('.row'));
+  }
+
+  // Surfaces what the fixed routing table cannot: whether anyone is actually reachable, and whether any
+  // admin is — a test notification with no enabled admin reaches nobody, which reads as a broken webhook
+  // rather than a configuration gap.
+  function refreshCounts() {
+    var live = currentRows().filter(function (row) { return row.isLive(); });
+    var admins = live.filter(function (row) { return row.isAdmin(); });
+    var note = el('adminCount');
+    if (!note) return;
+    if (live.length === 0) {
+      note.textContent = 'No recipient is enabled with a number — nothing can be delivered.';
+    } else if (admins.length === 0) {
+      note.textContent = 'No enabled recipient is a Seerr admin, so the admin rows above reach nobody (including TEST_NOTIFICATION).';
+    } else {
+      note.textContent = live.length + ' recipient(s) enabled, ' + admins.length + ' of them Seerr admin(s).';
+    }
+  }
+
+  // ── Host bridge ─────────────────────────────────────────────────────────
+  function populateConfig(config) {
+    var cfg = config || {};
+    SCALARS.forEach(function (key) { el(key).value = cfg[key] === undefined || cfg[key] === null ? '' : String(cfg[key]); });
+    // Every boolean defaults ON except debug, matching the manifest's declared defaults.
+    BOOLEANS.forEach(function (key) {
+      var fallback = key !== 'debug';
+      el(key).checked = typeof cfg[key] === 'boolean' ? cfg[key] : fallback;
+    });
+
+    roster = Array.isArray(cfg.seerrRoster) ? cfg.seerrRoster.slice() : [];
+    rosterSyncedAt = typeof cfg.rosterSyncedAt === 'string' ? cfg.rosterSyncedAt : '';
+    refreshToken = typeof cfg.rosterRefreshRequestedAt === 'string' ? cfg.rosterRefreshRequestedAt : '';
+
+    // Stored routing layered over the defaults, so a config saved before this tab existed — or one
+    // missing a cell — still renders complete rules rather than blanks.
+    resetRouting();
+    var stored = cfg.routing && typeof cfg.routing === 'object' ? cfg.routing : {};
+    ROUTED_EVENTS.forEach(function (event) {
+      var cell = stored[event];
+      if (!cell || typeof cell !== 'object') return;
+      ['user', 'admin', 'adminInfo'].forEach(function (key) {
+        if (typeof cell[key] === 'boolean') routing[event][key] = cell[key];
+      });
+      if (!supportsAdminInfo(event)) routing[event].adminInfo = false;
+    });
+    renderRouting();
+    var mappings = Array.isArray(cfg.users) ? cfg.users : [];
+    var byId = {};
+    mappings.forEach(function (m) {
+      if (m && m.seerrUserId !== undefined && m.seerrUserId !== null) byId[String(m.seerrUserId)] = m;
+    });
+
+    // Configured ids the roster no longer knows about keep a row, flagged, so a deleted Seerr account
+    // or a not-yet-refreshed roster never silently discards a mapping on the next save.
+    var known = {};
+    roster.forEach(function (entry) { known[String(entry.id)] = true; });
+    var orphans = mappings
+      .filter(function (m) { return m && m.seerrUserId !== undefined && m.seerrUserId !== null && !known[String(m.seerrUserId)]; })
+      .map(function (m) { return { id: m.seerrUserId, name: m.username || '', email: m.email || '', isAdmin: m.isAdmin === true, missing: true }; });
+
+    userRows.innerHTML = '';
+    orphans.concat(roster).forEach(function (entry) {
+      userRows.appendChild(renderRow(entry, byId[String(entry.id)]));
+    });
+
+    var meta = el('rosterMeta');
+    if (roster.length === 0) {
+      meta.textContent = 'No Seerr accounts cached yet — hit Refresh from Seerr, then reload this page.';
+    } else {
+      var when = cfg.rosterSyncedAt ? String(cfg.rosterSyncedAt).replace('T', ' ').slice(0, 16) : 'unknown';
+      meta.textContent = roster.length + ' Seerr account(s), synced ' + when;
+    }
+    refreshCounts();
+    applyFilter();
+  }
+
+  function assembleConfig() {
+    var cfg = {};
+    SCALARS.forEach(function (key) { cfg[key] = el(key).value.trim(); });
+    BOOLEANS.forEach(function (key) { cfg[key] = el(key).checked; });
+    // Only rows the operator actually touched are persisted; an untouched, unticked account would
+    // otherwise write one dead mapping row per Seerr user on every save.
+    cfg.users = currentRows()
+      .map(function (row) { return row.readMapping(); })
+      .filter(function (m) { return m.enabled || m.number !== ''; });
+    // Written back verbatim: the editor never edits the roster, but dropping it here would erase the
+    // cache on the next save and blank the list until the next refresh.
+    cfg.seerrRoster = roster;
+    cfg.rosterSyncedAt = rosterSyncedAt;
+    cfg.rosterRefreshRequestedAt = refreshToken;
+    cfg.routing = routing;
+    return cfg;
+  }
+
+  // The editor has no network of its own, so "Refresh from Seerr" cannot fetch anything. It stamps a new
+  // token and saves: the plugin sees the changed token in onConfigChange, fetches the roster, and writes
+  // it back into config. The dashboard answers config:get from the plugin list the PAGE loaded with, so
+  // the new roster only appears after a reload — which is what the message below says.
+  function requestRefresh() {
+    refreshToken = new Date().toISOString();
+    refreshBtn.disabled = true;
+    saveBtn.disabled = true;
+    showFeedback('', true);
+    parent.postMessage({ type: 'config:save', config: assembleConfig() }, '*');
+  }
+
+  function showFeedback(message, isOk) {
+    feedback.textContent = message;
+    feedback.className = isOk ? 'ok' : 'err';
+  }
+
+  // The host resolves 'system' for us, so this is only ever 'light' or 'dark'. Anything else (including
+  // a host too old to send it) leaves the attribute off, which falls back to the OS preference.
+  function applyTheme(theme) {
+    if (theme === 'light' || theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  }
+
+  window.addEventListener('message', function (event) {
+    var data = event.data;
+    if (!data || typeof data.type !== 'string') return;
+    if (data.type === 'config:value') {
+      applyTheme(data.theme);
+      populateConfig(data.config);
+    } else if (data.type === 'config:saved') {
+      if (refreshBtn.disabled) {
+        showFeedback('Fetching from Seerr… reload this page in a few seconds to see the list.', true);
+        refreshBtn.disabled = false;
+      } else {
+        showFeedback('Saved.', true);
+      }
+      saveBtn.disabled = false;
+    } else if (data.type === 'config:error') {
+      refreshBtn.disabled = false;
+      showFeedback(data.message || 'Save failed.', false);
+      saveBtn.disabled = false;
+    }
+  });
+
+  saveBtn.addEventListener('click', function () {
+    var cfg = assembleConfig();
+    var live = cfg.users.filter(function (m) { return m.enabled && m.number !== ''; });
+    if (live.length === 0) {
+      showFeedback('Enable at least one recipient and give them a WhatsApp number.', false);
+      return;
+    }
+    saveBtn.disabled = true;
+    showFeedback('', true);
+    parent.postMessage({ type: 'config:save', config: cfg }, '*');
+  });
+
+  el('userFilter').addEventListener('input', applyFilter);
+  el('enabledOnly').addEventListener('change', applyFilter);
+  refreshBtn.addEventListener('click', requestRefresh);
+  el('routingReset').addEventListener('click', resetRouting);
+
+  parent.postMessage({ type: 'config:get' }, '*');
+})();
+</script>
+</body>
+</html>

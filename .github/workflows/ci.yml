@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Build package
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: seerr-notify-zip
+          path: seerr-notify.zip
+
+  # Tagging `v1.5.0` publishes a Release with the installable .zip attached, so the install
+  # instructions in the README point at a stable URL rather than a CI artifact.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Checksum
+        run: sha256sum seerr-notify.zip > seerr-notify.zip.sha256
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            seerr-notify.zip
+            seerr-notify.zip.sha256
+          generate_release_notes: true
