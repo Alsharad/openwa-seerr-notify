@@ -6,6 +6,22 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.12.0] — 2026-08-21
+
+### Changed
+
+- **The Connection tab uses the same control as the Setup tab.** Both credentials are now a rail —
+  `[label] [value] [actions]` — with the same reveal and copy buttons, driven by one implementation bound
+  twice rather than two that can drift. The bare labelled-input styling is deleted, so every value the
+  operator types or copies (server address, API key, webhook URL, ingress secret, recipient filter) is
+  the same control with the same habits. The Setup tab’s guide link moves inside its card, since it was
+  the one rail floating outside one.
+- **The API key is shown, not hidden.** The plugin mirrors it into `setup.seerrApiKey`, exactly as it
+  already surfaced the ingress secret, because the host redacts `jellyseerrApiKey` to `***` before config
+  reaches the panel — which is why the field first showed three characters and then nothing at all. The
+  trade is written up under *Both credentials are readable in `setup`* in the README: an admin API key can
+  read both in the clear, and `mirrorSeerrKey` can be deleted if you would rather it could not.
+
 ## [1.11.2] — 2026-08-21
 
 ### Fixed

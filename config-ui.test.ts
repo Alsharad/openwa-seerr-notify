@@ -321,26 +321,43 @@ test('every button that waits on the plugin waits the same way', () => {
   assert.match(plugin, /lastAction: `roster\$\{'\$'\}\{token\}`|lastAction: `roster\|\$\{token\}`/);
 });
 
-test('a saved API key is neither shown nor wiped', () => {
-  // The host replaces a stored secret with SECRET_SENTINEL ('***') before the config reaches this frame.
-  // Putting that in the field made a saved key look like a three-character one — and an empty field has
-  // to go back as the sentinel, or every save silently erases the key the panel never showed.
+test('the API key is shown from the mirror, and never wiped when it is not', () => {
+  // The host replaces a stored secret with SECRET_SENTINEL ('***') before config reaches this frame, so
+  // the real key comes from the plugin's mirror — `setup.seerrApiKey` — the same way the ingress secret
+  // does. The sentinel path still has to work: on an install whose mirror has not been written yet the
+  // field is empty while a key IS stored, and saving an empty string there would erase it.
   const script = html.split('<script>')[1];
   assert.match(script, /var SECRET_SENTINEL = '\*\*\*';/, 'the sentinel must match the host');
   assert.match(
     script,
-    /apiKeySaved = cfg\.jellyseerrApiKey === SECRET_SENTINEL;[\s\S]*?if \(apiKeySaved\) el\('jellyseerrApiKey'\)\.value = '';/,
-    'a redacted key must leave the field empty rather than displaying the sentinel',
+    /cfg\.setup && typeof cfg\.setup\.seerrApiKey === 'string' \? cfg\.setup\.seerrApiKey : ''/,
+    'the displayed key must come from the mirror, since the redacted one can never be shown',
   );
-  // An empty box is ambiguous, so the control has to say which state it is in — and not contradict
-  // itself while doing it.
-  assert.match(script, /el\('apiKeySavedPill'\)\.hidden = !apiKeySaved;/, 'a saved key must be visibly saved');
-  assert.match(script, /'saved — type a new key to replace it…'/, 'the placeholder must state the action, not deny the key');
   assert.match(
     script,
     /if \(cfg\.jellyseerrApiKey === '' && apiKeySaved\) cfg\.jellyseerrApiKey = SECRET_SENTINEL;/,
-    'an untouched key must round-trip as the sentinel, or saving wipes it',
+    'with no mirror yet, an untouched key must round-trip as the sentinel or saving wipes it',
   );
+
+  // And the plugin has to keep that mirror current, without the write it makes looping back on itself.
+  const plugin = readFileSync(join(HERE, 'index.ts'), 'utf8');
+  assert.match(plugin, /if \(previous\.seerrApiKey === stored\) return;/, 'the mirror must stop when it agrees');
+});
+
+test('both credentials are the same control', () => {
+  // The complaint that produced this: the Setup tab had a rail with reveal and copy, and Connection had
+  // a bare input, so the two credentials of the same plugin looked like two different products.
+  const markup = html.split('<script>')[0];
+  const script = html.split('<script>')[1];
+
+  for (const id of ['jellyseerrUrl', 'jellyseerrApiKey', 'ingressSecret', 'webhookUrl']) {
+    const field = new RegExp(`<div class="rail">[\\s\\S]{0,600}?id="${id}"`);
+    assert.match(markup, field, `${id} must sit in a rail like every other machine value`);
+  }
+  // One reveal implementation, bound twice — not two that can drift apart.
+  assert.match(script, /function bindReveal\(/);
+  assert.match(script, /bindReveal\('revealSecret', 'ingressSecret', 'secret'\);/);
+  assert.match(script, /bindReveal\('revealApiKey', 'jellyseerrApiKey', 'API key'\);/);
 });
 
 test('installing an update is offered only when there is one, and never unpinned', () => {

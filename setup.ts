@@ -47,6 +47,17 @@ export interface SetupState {
   instancesAt: string;
   /** Plaintext ingress secret from the last rotation, until the operator clears it. */
   secret: string;
+  /**
+   * The Seerr API key, mirrored so the Connection tab can show it.
+   *
+   * The host redacts `jellyseerrApiKey` to '***' before config reaches the config UI, so the panel could
+   * never display the stored one — which is why it first rendered as three characters and then as an
+   * empty box. The plugin does have it. Mirroring it here is the same trade already made for the ingress
+   * secret above: readable to an admin API key, in exchange for a credential field the operator can
+   * actually see and copy. It makes the two credentials behave identically instead of one being a
+   * special case with its own rules.
+   */
+  seerrApiKey: string;
   /** Which instance `secret` belongs to. */
   secretFor: string;
   secretAt: string;
@@ -64,6 +75,7 @@ export const EMPTY_SETUP: SetupState = {
   instances: [],
   instancesAt: '',
   secret: '',
+  seerrApiKey: '',
   secretFor: '',
   secretAt: '',
   update: null,
@@ -81,6 +93,7 @@ export function readSetup(raw: unknown): SetupState {
     instances: Array.isArray(row.instances) ? (row.instances as SetupInstance[]) : [],
     instancesAt: str(row.instancesAt),
     secret: str(row.secret),
+    seerrApiKey: str(row.seerrApiKey),
     secretFor: str(row.secretFor),
     secretAt: str(row.secretAt),
     update: (row.update ?? null) as UpdateState | null,

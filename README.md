@@ -236,12 +236,19 @@ are listed because they are what the REST API and any backup will show you.
 | `updateCheckEnabled` | no | `true` | Ask `api.github.com` for the latest release once a day, and show a banner when it is newer than the running build. Nothing is ever downloaded or installed. Off = no outbound request is made at all. The check also runs on demand from **Options → Check now**. |
 | `debug` | no | `false` | One gateway log line per delivery: event type, resolved recipient count, chat ids masked to their last four digits, and each send's outcome. Message bodies are never logged at any level. Shown in the panel as **Verbose logging**. |
 
-`setup.secret` holds the plaintext ingress secret from the last **Generate**. That is deliberate, and it
-is the only way the value can reach you: the gateway reveals an ingress secret exactly once, in the
-response to the call that mints it, and a config field flagged `secret` arrives at the config screen as
-`***`. It is the credential for one ingress route, readable only by an admin API key — the same key class
-that could rotate it anyway — and Seerr stores its copy in the clear regardless. Rotate it with the
-regenerate icon if it leaks.
+### Both credentials are readable in `setup`
+
+`setup.secret` holds the plaintext ingress secret from the last **Generate**, and `setup.seerrApiKey`
+mirrors your Seerr API key. Both are deliberate, and both exist for the same reason: a field flagged
+`secret` in the schema reaches the config screen as `***`, so a panel can only ever display a credential
+the plugin puts somewhere unredacted. Without the mirror the API key field showed three asterisks, then
+an empty box — neither of which is a control you can use.
+
+What that costs: an ADMIN, unscoped API key reading `GET /plugins` sees both values in the clear.
+Everything that can read them could already do more than read them — that key class can rotate the
+ingress secret, rewrite the config, or uninstall the plugin — and Seerr stores its own copy of the API key
+in the clear regardless. If you would rather it did not, delete `mirrorSeerrKey` from `index.ts`; the
+field falls back to the empty-with-sentinel behaviour, which still saves correctly.
 
 Every **Now Available** section — overview, rating, runtime, genres, director/creator, top cast, trailer,
 seasons, collection — is always on. These were nine separate toggles until v1.2.0; that was more

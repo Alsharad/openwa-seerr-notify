@@ -174,10 +174,8 @@
   a.rail-link:hover { color: var(--accent); text-decoration: underline; }
 
   /* ── Fields ───────────────────────────────────────────────────────────── */
-  .field { margin-bottom: 12px; }
-  .field > label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
-  .field > label .pill { margin-left: 6px; vertical-align: 1px; }
-  .field small { display: block; color: var(--ink-dim); font-size: 11px; margin-top: 5px; }
+  /* Bare labelled inputs are gone: every value the operator types or copies is a rail now, so the two
+     credentials, the webhook URL and the recipient filter are one control with one set of habits. */
   input[type="text"], input[type="password"], input[type="tel"], input[type="search"], select {
     width: 100%; padding: 8px 10px; font: inherit; font-size: 13px; color: var(--ink);
     background: var(--sunk); border: 1px solid var(--edge); border-radius: var(--radius-sm);
@@ -325,18 +323,35 @@
   <p class="lede">Recipients and media details both come from Seerr, so both fields are required.</p>
 
   <div class="card">
-    <div class="field">
-      <label for="jellyseerrUrl">Server address</label>
-      <input type="text" id="jellyseerrUrl" name="jellyseerrUrl" class="mono" inputmode="url"
+    <div class="rail">
+      <label class="tag" for="jellyseerrUrl">Server</label>
+      <input type="text" id="jellyseerrUrl" name="jellyseerrUrl" inputmode="url"
              autocomplete="off" spellcheck="false" translate="no" placeholder="http://192.168.1.50:5055…" />
+      <div class="acts">
+        <button type="button" class="icon" id="copyUrlSeerr" data-icon="i-copy" aria-label="Copy the server address">
+          <svg width="15" height="15" aria-hidden="true"><use href="#i-copy" /></svg>
+        </button>
+      </div>
     </div>
-    <div class="field">
-      <label for="jellyseerrApiKey">API key <span class="pill" id="apiKeySavedPill" hidden>SAVED</span></label>
-      <input type="password" id="jellyseerrApiKey" name="jellyseerrApiKey" class="mono"
+
+    <div class="rail">
+      <label class="tag" for="jellyseerrApiKey">API key</label>
+      <input type="password" id="jellyseerrApiKey" name="jellyseerrApiKey"
              autocomplete="off" spellcheck="false" translate="no" placeholder="paste your Seerr API key…" />
-      <small>Seerr → Settings → General → API Key</small>
+      <div class="acts">
+        <button type="button" class="icon" id="revealApiKey" aria-label="Show the API key" aria-pressed="false">
+          <svg width="15" height="15" aria-hidden="true"><use href="#i-eye" /></svg>
+        </button>
+        <button type="button" class="icon" id="copyApiKey" data-icon="i-copy" aria-label="Copy the API key">
+          <svg width="15" height="15" aria-hidden="true"><use href="#i-copy" /></svg>
+        </button>
+      </div>
     </div>
-    <p class="hint">Test them with the health check on the plugin row.</p>
+
+    <p class="hint" style="margin-top:10px">
+      The key is in Seerr under <b>Settings → General → API Key</b>. Test both with the health check on the
+      plugin row.
+    </p>
   </div>
 </section>
 
@@ -494,14 +509,14 @@
     <p class="hint" style="margin-top:10px">
       Leave the <b>JSON Payload</b> at Seerr’s default, and tick the notification types you want.
     </p>
-  </div>
 
-  <div class="rail">
-    <span class="tag">Full guide</span>
-    <a class="rail-link" id="repoLink" href="https://github.com/Alsharad/openwa-seerr-notify#setup" rel="noopener noreferrer">
-      <span translate="no">github.com/Alsharad/openwa-seerr-notify</span>
-      <svg width="13" height="13" aria-hidden="true"><use href="#i-external" /></svg>
-    </a>
+    <div class="rail" style="margin-top:10px">
+      <span class="tag">Full guide</span>
+      <a class="rail-link" id="repoLink" href="https://github.com/Alsharad/openwa-seerr-notify#setup" rel="noopener noreferrer">
+        <span translate="no">github.com/Alsharad/openwa-seerr-notify</span>
+        <svg width="13" height="13" aria-hidden="true"><use href="#i-external" /></svg>
+      </a>
+    </div>
   </div>
 </section>
 
@@ -1086,16 +1101,15 @@
     var cfg = config || {};
     SCALARS.forEach(function (key) { el(key).value = cfg[key] === undefined || cfg[key] === null ? '' : String(cfg[key]); });
 
-    // The stored key cannot be shown — the host redacts it to SECRET_SENTINEL before the config gets
-    // here — so the field is empty whether one is saved or not. Which state it is in has to be said by
-    // the control itself: an empty box under a placeholder reading "paste your API key" says "there
-    // isn't one", and a line of grey text below saying the opposite does not undo that.
+    // `jellyseerrApiKey` arrives redacted — the host substitutes SECRET_SENTINEL before config reaches
+    // this frame — so the real value comes from the plugin's mirror instead, exactly like the ingress
+    // secret on the Setup tab. Both credentials are then the same control with the same buttons, rather
+    // than one of them being a box that shows three asterisks or nothing at all.
+    var mirrored = cfg.setup && typeof cfg.setup.seerrApiKey === 'string' ? cfg.setup.seerrApiKey : '';
     apiKeySaved = cfg.jellyseerrApiKey === SECRET_SENTINEL;
-    if (apiKeySaved) el('jellyseerrApiKey').value = '';
-    el('apiKeySavedPill').hidden = !apiKeySaved;
-    el('jellyseerrApiKey').placeholder = apiKeySaved
-      ? 'saved — type a new key to replace it…'
-      : 'paste your Seerr API key…';
+    if (apiKeySaved) el('jellyseerrApiKey').value = mirrored;
+    el('revealApiKey').disabled = el('jellyseerrApiKey').value === '';
+    el('copyApiKey').disabled = el('jellyseerrApiKey').value === '';
     // Every switch defaults on except debug, matching the manifest's declared defaults.
     BOOLEANS.forEach(function (key) {
       var fallback = key !== 'debug';
@@ -1150,8 +1164,9 @@
   function assembleConfig() {
     var cfg = {};
     SCALARS.forEach(function (key) { cfg[key] = el(key).value.trim(); });
-    // Empty means "leave the saved key alone", which is what the sentinel tells the host. Without this a
-    // Save — or any button that saves, which is all of them — would wipe the key it never showed you.
+    // The field normally holds the real key (from the plugin's mirror), so it saves verbatim. The
+    // fallback matters on an install whose mirror has not been written yet: there the field is empty
+    // while a key IS stored, and an empty string would erase it — the sentinel says "leave it alone".
     if (cfg.jellyseerrApiKey === '' && apiKeySaved) cfg.jellyseerrApiKey = SECRET_SENTINEL;
     BOOLEANS.forEach(function (key) { cfg[key] = el(key).checked; });
     // Only rows the operator actually touched are persisted; an untouched, unticked account would
@@ -1271,14 +1286,31 @@
   el('copySecret').addEventListener('click', function () {
     copyText(el('ingressSecret').value, el('copySecret'), el('ingressSecret'));
   });
-  el('revealSecret').addEventListener('click', function () {
-    var field = el('ingressSecret');
-    var button = el('revealSecret');
-    var shown = field.type === 'text';
-    field.type = shown ? 'password' : 'text';
-    button.setAttribute('aria-pressed', shown ? 'false' : 'true');
-    button.setAttribute('aria-label', shown ? 'Show the secret' : 'Hide the secret');
-    setIcon(button, shown ? 'i-eye' : 'i-eye-off');
+  /** One reveal behaviour, used by both credential fields — they are the same control. */
+  function bindReveal(buttonId, fieldId, noun) {
+    el(buttonId).addEventListener('click', function () {
+      var field = el(fieldId);
+      var button = el(buttonId);
+      var shown = field.type === 'text';
+      field.type = shown ? 'password' : 'text';
+      button.setAttribute('aria-pressed', shown ? 'false' : 'true');
+      button.setAttribute('aria-label', (shown ? 'Show the ' : 'Hide the ') + noun);
+      setIcon(button, shown ? 'i-eye' : 'i-eye-off');
+    });
+  }
+  bindReveal('revealSecret', 'ingressSecret', 'secret');
+  bindReveal('revealApiKey', 'jellyseerrApiKey', 'API key');
+
+  el('copyApiKey').addEventListener('click', function () {
+    copyText(el('jellyseerrApiKey').value, el('copyApiKey'), el('jellyseerrApiKey'));
+  });
+  el('copyUrlSeerr').addEventListener('click', function () {
+    copyText(el('jellyseerrUrl').value, el('copyUrlSeerr'), el('jellyseerrUrl'));
+  });
+  el('jellyseerrApiKey').addEventListener('input', function () {
+    var empty = el('jellyseerrApiKey').value === '';
+    el('revealApiKey').disabled = empty;
+    el('copyApiKey').disabled = empty;
   });
   el('updateCheckEnabled').addEventListener('change', renderSetup);
   el('checkUpdate').addEventListener('click', function () {

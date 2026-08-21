@@ -174,6 +174,9 @@ export default class SeerrNotifyPlugin implements IPlugin {
     this.settingUp = true;
     try {
       const config = ctx.config as Record<string, unknown>;
+      // Before the pass, so an install or a restart brings the mirror up to date even if the operator
+      // has never touched the config since the key was set.
+      await this.mirrorSeerrKey(ctx).catch(() => undefined);
       const state = await refreshSetupInBackground(this.setupDeps(ctx), readSetup(config.setup), {
         checkUpdates: config.updateCheckEnabled !== false,
         intervalMs: CHECK_INTERVAL_MS,
@@ -206,6 +209,27 @@ export default class SeerrNotifyPlugin implements IPlugin {
     this.ctx = ctx;
     await this.handleRosterToken(ctx, newConfig);
     await this.handleSetupToken(ctx, newConfig);
+    await this.mirrorSeerrKey(ctx).catch((err) =>
+      ctx.logger.debug(`seerr-notify: could not mirror the Seerr key — ${String(err)}`),
+    );
+  }
+
+  /**
+   * Keep `setup.seerrApiKey` equal to the stored Seerr key.
+   *
+   * This is the only reason the Connection tab can show the key at all: the host redacts
+   * `jellyseerrApiKey` to '***' before config reaches the config UI, so the panel never receives it.
+   *
+   * It writes only when the two differ, which is what stops it looping — the write it triggers comes
+   * back through onConfigChange, finds them equal, and does nothing.
+   */
+  private async mirrorSeerrKey(ctx: PluginContext): Promise<void> {
+    const config = ctx.config as Record<string, unknown>;
+    const stored = typeof config.jellyseerrApiKey === 'string' ? config.jellyseerrApiKey : '';
+    const previous = readSetup(config.setup);
+    if (previous.seerrApiKey === stored) return;
+
+    await writePluginConfig(this.setupDeps(ctx), { setup: { ...previous, seerrApiKey: stored } });
   }
 
   /** The Setup tab: read the ingress instances, rotate a secret, or check GitHub for a release. */
