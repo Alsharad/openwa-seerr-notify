@@ -39,6 +39,16 @@ export interface MediaAvailableFlags {
   showCollection: boolean;
 }
 
+/** The Seerr connection alone, readable without a recipient list — see readSeerrConnection. */
+export interface SeerrConnection {
+  url: string;
+  apiKey: string;
+  /** Enrichment will actually run: switched on AND both settings present. */
+  enabled: boolean;
+  /** URL and key are both present. Separates "switched off" from "never filled in". */
+  configured: boolean;
+}
+
 export interface SeerrConfig {
   jellyseerr: { url: string; apiKey: string; enabled: boolean };
   /** URL and key are both present. Separates "switched off" from "never filled in" in health output. */
@@ -127,6 +137,26 @@ function readUsers(raw: unknown, roster: Map<number, RosterEntry>): SeerrUser[] 
 }
 
 /**
+ * The Seerr connection settings on their own.
+ *
+ * Split out of readConfig because the health check has to report on the connection even when readConfig
+ * refuses the config as undeliverable: on a fresh install there are no recipients yet, and "test my Seerr
+ * settings" is the button an operator reaches for BEFORE mapping anyone.
+ */
+export function readSeerrConnection(raw: Record<string, unknown>): SeerrConnection {
+  const url = str(raw.jellyseerrUrl).replace(/\/+$/, '');
+  const apiKey = str(raw.jellyseerrApiKey);
+  return {
+    url,
+    apiKey,
+    // Enrichment needs all three: the toggle, a base URL and a key. Missing any one degrades the
+    // plugin to payload-only formatting rather than failing the delivery.
+    enabled: bool(raw.enrichmentEnabled, true) && url !== '' && apiKey !== '',
+    configured: url !== '' && apiKey !== '',
+  };
+}
+
+/**
  * Parse and validate operator config. Throws when the plugin could not deliver anything at all, so the
  * failure surfaces in the dashboard at enable time instead of once per webhook.
  */
@@ -139,19 +169,12 @@ export function readConfig(raw: Record<string, unknown>): SeerrConfig {
     );
   }
 
-  const url = str(raw.jellyseerrUrl).replace(/\/+$/, '');
-  const apiKey = str(raw.jellyseerrApiKey);
+  const seerr = readSeerrConnection(raw);
   const fallbackSessionId = str(raw.fallbackSessionId);
 
   return {
-    jellyseerr: {
-      url,
-      apiKey,
-      // Enrichment needs all three: the toggle, a base URL and a key. Missing any one degrades the
-      // plugin to payload-only formatting rather than failing the delivery.
-      enabled: bool(raw.enrichmentEnabled, true) && url !== '' && apiKey !== '',
-    },
-    jellyseerrConfigured: url !== '' && apiKey !== '',
+    jellyseerr: { url: seerr.url, apiKey: seerr.apiKey, enabled: seerr.enabled },
+    jellyseerrConfigured: seerr.configured,
     requireMappedUser: bool(raw.requireMappedUser, true),
     fallbackSessionId: fallbackSessionId || undefined,
     users,

@@ -15,15 +15,15 @@
 //     always reach that file — this makes the reach explicit rather than adding a new one.
 //   • The self-call goes through Node's global fetch, NOT ctx.net.fetch. The SSRF guard blocks loopback,
 //     and widening SSRF_ALLOWED_HOSTS to admit 127.0.0.1 would open loopback for EVERY plugin on the
-//     host. Keeping the exception local to this one call is the narrower choice. The Seerr fetch below
+//     host. Keeping the exception local to that one call is the narrower choice. The Seerr fetch below
 //     still goes through the guarded ctx.net.fetch.
 //
-// Config writes are a shallow merge host-side (`plugin.config = {...plugin.config, ...config}`), so this
-// sends only the three roster keys and cannot clobber the operator's other settings — including the
-// Seerr API key, which is never read or rewritten here.
+// Both live in gateway.ts now, shared with the Setup tab (setup.ts); this file keeps the Seerr half.
 
 import { toRosterEntry } from './roster.ts';
 import type { RosterEntry } from './roster.ts';
+import { writePluginConfig } from './gateway.ts';
+import type { GatewayDeps } from './gateway.ts';
 import type { NetFetch } from './seerr-client.ts';
 
 /** Where the gateway writes its seeded admin key. Docker path first, then a bare-metal checkout. */
@@ -33,16 +33,9 @@ const SEERR_PAGE_SIZE = 100;
 /** A refresh runs in the background of a config save, so it can afford a longer budget than a delivery. */
 const SEERR_TIMEOUT_MS = 15_000;
 
-export interface RefreshDeps {
+export interface RefreshDeps extends GatewayDeps {
   /** ctx.net.fetch — SSRF-guarded, scoped to the manifest net.allow host list. */
   seerrFetch: NetFetch;
-  /** Node's global fetch, for the loopback self-call only. */
-  selfFetch: (url: string, init?: RequestInit) => Promise<{ ok: boolean; status: number; text(): Promise<string> }>;
-  /** Resolves the gateway admin key, or throws with an actionable message. */
-  readApiKey: () => Promise<string>;
-  /** The gateway's own base URL, e.g. http://127.0.0.1:2785. */
-  selfUrl: string;
-  pluginId: string;
   log: (message: string, meta?: Record<string, unknown>) => void;
 }
 
@@ -110,30 +103,17 @@ export async function refreshRoster(
     return { ok: false, message: `could not read the Seerr user list: ${err instanceof Error ? err.message : String(err)}` };
   }
 
-  let apiKey: string;
+  // Only the roster keys: the host merges shallowly, so everything else is left exactly as it is —
+  // including the Seerr API key, which is never read or rewritten here. The token is echoed back so the
+  // write cannot loop (see the note above).
   try {
-    apiKey = await deps.readApiKey();
-  } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) };
-  }
-
-  // Only the roster keys: the host merges shallowly, so everything else is left exactly as it is.
-  const body = JSON.stringify({
-    config: { seerrRoster: roster, rosterSyncedAt: new Date().toISOString(), rosterRefreshRequestedAt: token },
-  });
-
-  try {
-    const res = await deps.selfFetch(`${deps.selfUrl}/api/plugins/${deps.pluginId}/config`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-      body,
+    await writePluginConfig(deps, {
+      seerrRoster: roster,
+      rosterSyncedAt: new Date().toISOString(),
+      rosterRefreshRequestedAt: token,
     });
-    if (!res.ok) {
-      const detail = (await res.text()).slice(0, 200);
-      return { ok: false, message: `writing the roster back failed: HTTP ${res.status} ${detail}` };
-    }
   } catch (err) {
-    return { ok: false, message: `could not reach the gateway to save the roster: ${err instanceof Error ? err.message : String(err)}` };
+    return { ok: false, message: `writing the roster back failed: ${err instanceof Error ? err.message : String(err)}` };
   }
 
   const admins = roster.filter((entry) => entry.isAdmin).length;

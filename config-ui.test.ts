@@ -12,6 +12,7 @@ import { normalizePayload } from './normalize.ts';
 import { resolveRecipients } from './recipients.ts';
 import { formatMessages } from './formatter.ts';
 import { DEFAULT_ROUTING, ROUTED_EVENTS, routingFor, supportsAdminInfo } from './routing.ts';
+import { parseSetupAction } from './setup.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(join(HERE, 'config', 'index.html'), 'utf8');
@@ -133,6 +134,10 @@ test('the editor declares every field the manifest schema does, and no others', 
     // Re-stamped only by the Refresh button — the signal the plugin acts on.
     'rosterRefreshRequestedAt',
     'routing',
+    // Owned by the plugin, round-tripped here: ingress URLs, the generated secret, the release check.
+    'setup',
+    // Stamped by a Setup tab button, cleared by the plugin once the action has run.
+    'setupRequestedAt',
   ].sort();
 
   assert.deepEqual(edited, declared);
@@ -144,4 +149,58 @@ test('configUi points at the file that exists and is packaged by its top-level d
   // Self-contained: an opaque-origin srcdoc iframe cannot load subresources.
   assert.doesNotMatch(html, /<script[^>]+\ssrc=/, 'external script would not load in the sandbox');
   assert.doesNotMatch(html, /<link[^>]+rel=["']stylesheet/, 'external stylesheet would not load in the sandbox');
+});
+
+test('every element the editor script reaches for exists in its markup', () => {
+  // 700 lines of HTML that no compiler checks: a renamed id fails at runtime, inside a sandboxed iframe,
+  // as a null dereference nobody sees. This is the cheapest possible guard against that.
+  const referenced = new Set([...html.matchAll(/\bel\('([^']+)'\)/g)].map((m) => m[1]));
+  const present = new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
+
+  const missing = [...referenced].filter((id) => !present.has(id));
+  assert.deepEqual(missing, [], 'the script reads ids the markup does not define');
+});
+
+test('the Setup buttons stamp tokens the plugin actually acts on', () => {
+  // The editor's only channel to the plugin is a token string in config. Both halves are written by
+  // hand, in different languages, and neither compiler sees the other — so assert them against each other.
+  const actions = [...html.matchAll(/requestSetup\('([^']+)'/g)].map((m) => m[1]);
+  assert.deepEqual([...new Set(actions)].sort(), ['instances', 'secret', 'update']);
+
+  const stamp = /setupToken = action \+ '\|' \+ \(arg \|\| ''\) \+ '\|' \+ new Date\(\).toISOString\(\)/.test(html);
+  assert.ok(stamp, 'the token format changed; parseSetupAction has to change with it');
+
+  for (const action of actions) {
+    const arg = action === 'secret' ? 'seerr-prod' : '';
+    const token = `${action}|${arg}|2026-08-21T12:00:00.000Z`;
+    const parsed = parseSetupAction(token);
+    assert.equal(parsed?.name, action, `the plugin ignores the token the editor stamps for "${action}"`);
+    assert.equal(parsed?.arg, arg);
+  }
+});
+
+test('the editor script parses', () => {
+  // The inline script is never compiled by anything in this repo's toolchain — esbuild bundles index.ts,
+  // not the config UI, which ships as-is inside the zip. A syntax error would first be seen by an
+  // operator, as a blank panel. `new Function` compiles without executing, which is exactly the check.
+  const script = /<script>\n([\s\S]*?)\n<\/script>/.exec(html);
+  assert.ok(script, 'could not find the editor script');
+  assert.doesNotThrow(() => new Function(script[1]));
+});
+
+test('the manifest can reach an operator-hosted Seerr, not only an https one', () => {
+  // Proven on a live gateway: with net.allow scoped to a fixed host list, `http://192.168.1.8:5055`
+  // was refused as "Plugin seerr-notify may not fetch … add its host to net.allow", and there is no
+  // way for an operator to fix that without unzipping the package. net.allowConfigHosts cannot cover
+  // it either — the host only admits a config URL when it is https (core plugin-net.ts,
+  // effectiveNetAllow), and a self-hosted Seerr on a LAN is almost always plain http.
+  //
+  // So the allow-list is '*', and the real gate is the host's SSRF guard plus SSRF_ALLOWED_HOSTS,
+  // which is the operator's to set. Assert it, because narrowing this back to a host list would
+  // silently break every install whose Seerr is not on https.
+  const manifest = JSON.parse(readFileSync(join(HERE, 'manifest.json'), 'utf8')) as {
+    net?: { allow?: string[]; allowConfigHosts?: string[] };
+  };
+  assert.deepEqual(manifest.net?.allow, ['*']);
+  assert.deepEqual(manifest.net?.allowConfigHosts, ['jellyseerrUrl']);
 });

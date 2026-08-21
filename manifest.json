@@ -1,7 +1,7 @@
 {
   "id": "seerr-notify",
   "name": "Seerr Notifications",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "type": "extension",
   "main": "dist/index.js",
   "description": "Deliver Overseerr/Jellyseerr request and issue notifications over WhatsApp, formatted per recipient.",
@@ -34,7 +34,9 @@
     "*"
   ],
   "net": {
-    "allow": [],
+    "allow": [
+      "*"
+    ],
     "allowConfigHosts": [
       "jellyseerrUrl"
     ]
@@ -68,7 +70,7 @@
   ],
   "configUi": {
     "entry": "config/index.html",
-    "height": 620
+    "height": 700
   },
   "configSchema": {
     "type": "object",
@@ -179,6 +181,23 @@
         "title": "Roster refresh token",
         "description": "Stamped by the Refresh from Seerr button. Changing it is what asks the plugin to refetch the roster; it is not edited by hand.",
         "default": ""
+      },
+      "setup": {
+        "type": "object",
+        "title": "Setup state (plugin-written)",
+        "description": "Ingress instances, the last generated ingress secret and the update check, written by the plugin for the Setup tab. Not edited by hand."
+      },
+      "setupRequestedAt": {
+        "type": "string",
+        "title": "Setup action token",
+        "description": "Stamped by the Setup tab buttons as \"<action>|<arg>|<timestamp>\", and cleared by the plugin once the action has run. Not edited by hand.",
+        "default": ""
+      },
+      "updateCheckEnabled": {
+        "type": "boolean",
+        "title": "Check GitHub for new releases",
+        "description": "Once a day, ask github.com whether a newer release of this plugin exists, and show a banner if so. Nothing is downloaded or installed. Off = no outbound request is ever made.",
+        "default": true
       },
       "routing": {
         "type": "object",

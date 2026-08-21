@@ -6,6 +6,47 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-08-21
+
+### Added
+
+- **A Setup tab**, which is now the first thing the editor opens on. It shows the exact webhook URL to
+  paste into Seerr — read back from the gateway's own instance list rather than assembled by hand — the
+  header name, and the walkthrough of what to set in Seerr and what to leave alone.
+- **Generate a new secret.** The gateway reveals an ingress secret exactly once, in the response to the
+  call that mints it, so the editor cannot read the existing one back. This rotates the instance secret
+  and shows the plaintext with a Copy button, behind a two-click confirm because rotating breaks the
+  running webhook until the new value reaches Seerr. Clear it once Seerr has it.
+- **An update banner.** Once a day the plugin asks GitHub whether a newer release exists, and the editor
+  shows a banner with the release URL if so. Nothing is downloaded or installed. `updateCheckEnabled`
+  switches the check off entirely, and "Check now" runs it on demand.
+
+### Fixed
+
+- **A fresh install could not be set up.** `onEnable` threw when no recipient was mapped, which marks the
+  plugin ERROR — and the host does not deliver config changes to a plugin in ERROR. That stranded the
+  install: "Refresh from Seerr" and every Setup button work by saving a config change, and they are how a
+  first recipient comes to exist. The condition is now logged and reported by `healthCheck` instead, and
+  a delivery with nothing to deliver to is dropped with a reason rather than throwing per webhook.
+- The editor no longer refuses to save until a recipient exists — a first-run operator has to save a
+  Seerr URL and API key *before* a roster refresh can find anyone to map. It warns instead.
+
+- The health check now tests the Seerr connection **before** it looks at the recipient list, so "test my
+  Seerr settings" works on a fresh install. It previously returned `no recipients enabled` and never
+  probed — which is the wrong order: you connect Seerr, fetch the roster, and only then map anyone.
+- `net.allow` is now `["*"]`. Verified on a live gateway: with a fixed host list, a Seerr on
+  `http://192.168.1.8:5055` was refused with `Plugin seerr-notify may not fetch …`, and there was no way
+  to fix it without unzipping the package — `net.allowConfigHosts` only admits a config URL when it is
+  **https**, and a self-hosted Seerr almost never is. The real gate stays the host's SSRF guard and
+  `SSRF_ALLOWED_HOSTS`, which the operator controls.
+
+### Changed
+
+- The plugin reaches `api.github.com` for the release check. It is the only host it contacts that is not
+  the operator's own Seerr, and `updateCheckEnabled: false` stops it entirely.
+- The loopback self-call that lets the plugin write its own config moved into `gateway.ts`, shared by the
+  roster refresh and the Setup tab. Same mechanism, same constraints, one implementation.
+
 ## [1.5.0] — 2026-08-21
 
 ### Added

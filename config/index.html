@@ -114,6 +114,47 @@
   .row .adm { display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
   @media (max-width: 560px) { .row { grid-template-columns: auto 1fr auto; } .row .meta { display: none; } }
 
+  #updateBanner {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 12px; margin-bottom: 14px; border-radius: 8px; font-size: 13px;
+    border: 1px solid var(--accent); background: var(--panel);
+  }
+  #updateBanner b { font-weight: 700; }
+  #updateBanner code { font-size: 11px; color: var(--muted); }
+  #updateBanner[hidden] { display: none; }
+
+  .steps { list-style: none; margin: 0; padding: 0; }
+  .steps > li { padding: 0 0 16px 0; }
+  .steps h3 { font-size: 13px; margin: 0 0 6px; }
+  .steps p { margin: 0 0 8px; font-size: 12px; color: var(--muted); }
+  .steps ul { margin: 0 0 8px; padding-left: 18px; font-size: 12px; color: var(--muted); }
+  .steps li + li { margin-top: 2px; }
+  .note {
+    border-left: 3px solid var(--accent); background: var(--panel);
+    padding: 8px 10px; font-size: 12px; color: var(--muted); border-radius: 0 6px 6px 0;
+  }
+  .note strong { color: var(--fg); }
+  .copyline {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+    padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel);
+  }
+  .copyline code, .copyline input {
+    flex: 1 1 auto; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px; overflow-x: auto; white-space: nowrap; color: var(--fg);
+  }
+  .copyline input { border: none; background: none; padding: 0; }
+  .copyline input:focus { outline: none; }
+  .copyline .tag { font-size: 10px; color: var(--muted); white-space: nowrap; }
+  button.mini {
+    background: none; border: 1px solid var(--border); color: var(--fg); border-radius: 6px;
+    padding: 4px 9px; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
+  }
+  button.mini:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button.mini:disabled { opacity: .45; cursor: default; }
+  button.mini.armed { border-color: var(--danger); color: var(--danger); font-weight: 600; }
+  .setup-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .warn { color: var(--danger); font-size: 12px; }
+
   button.action {
     background: var(--accent); color: var(--accent-fg); border: none; border-radius: 6px;
     padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer;
@@ -128,14 +169,98 @@
 </head>
 <body>
 
+<div id="updateBanner" hidden>
+  <span>🎉 <b id="updateLatest"></b> is available — you are running <span id="updateCurrent"></span>.</span>
+  <code id="updateUrl"></code>
+  <button type="button" class="mini" id="copyUpdateUrl">Copy link</button>
+</div>
+
 <div class="tabs" role="tablist">
-  <button role="tab" id="tab-connection" aria-controls="panel-connection" aria-selected="true">Connection</button>
+  <button role="tab" id="tab-setup" aria-controls="panel-setup" aria-selected="true">Setup</button>
+  <button role="tab" id="tab-connection" aria-controls="panel-connection" aria-selected="false">Connection</button>
   <button role="tab" id="tab-recipients" aria-controls="panel-recipients" aria-selected="false">Recipients</button>
   <button role="tab" id="tab-routing" aria-controls="panel-routing" aria-selected="false">Who gets what</button>
   <button role="tab" id="tab-options" aria-controls="panel-options" aria-selected="false">Options</button>
 </div>
 
-<section id="panel-connection" role="tabpanel" aria-labelledby="tab-connection">
+<section id="panel-setup" role="tabpanel" aria-labelledby="tab-setup">
+  <h2>Point Seerr at this plugin</h2>
+  <p class="hint">
+    In Seerr: <strong>Settings → Notifications → Webhook</strong>. Tick <strong>Enable Agent</strong>, then fill in the
+    two fields below, leave everything else alone, and Save.
+  </p>
+
+  <ol class="steps">
+    <li>
+      <h3>1 · Webhook URL</h3>
+      <p>One per ingress instance. Paste the whole line into Seerr's <strong>Webhook URL</strong> field.</p>
+      <div id="instanceList"></div>
+      <div class="setup-bar">
+        <span id="instanceMeta"></span>
+        <button type="button" class="mini" id="refreshInstances">Refresh</button>
+      </div>
+    </li>
+
+    <li>
+      <h3>2 · Custom header</h3>
+      <p>
+        The route is authenticated by a shared secret in a header — that is what stops anyone on your network from
+        posting fake notifications to it. Add ONE custom header in Seerr:
+      </p>
+      <div class="copyline">
+        <span class="tag">Name</span>
+        <code>X-Seerr-Token</code>
+        <button type="button" class="mini" data-copy-text="X-Seerr-Token">Copy</button>
+      </div>
+      <div class="copyline">
+        <span class="tag">Value</span>
+        <input type="text" id="ingressSecret" readonly placeholder="generate one below, or use the secret shown when you created the instance" />
+        <button type="button" class="mini" id="copySecret">Copy</button>
+        <button type="button" class="mini" id="clearSecret">Clear</button>
+      </div>
+      <div class="setup-bar">
+        <select id="secretInstance" hidden></select>
+        <button type="button" class="mini" id="generateSecret">Generate a new secret</button>
+        <span id="secretMeta"></span>
+      </div>
+      <p class="warn" id="secretWarning" hidden>
+        This replaces the instance's current secret. Seerr will get <code>401 Unauthorized</code> on every
+        notification until you paste the new value into it. Click again to confirm.
+      </p>
+      <p style="margin-top:8px">
+        Leave <strong>Authorization Header</strong> empty — Seerr sends that one as a bare value with no scheme, which
+        this route does not read. Clear the secret from here once Seerr has it.
+      </p>
+    </li>
+
+    <li>
+      <h3>3 · JSON payload</h3>
+      <div class="note">
+        <strong>Leave the JSON payload at Seerr's default.</strong> Every field this plugin reads comes from that
+        template — <code>notification_type</code>, <code>subject</code>, <code>message</code>, <code>image</code>,
+        <code>media</code>, <code>request</code>, <code>issue</code>, <code>comment</code>. If you have edited it,
+        press <strong>Reset to Default</strong> in Seerr. Extra fields are ignored, so a template that only ADDS
+        things is fine.
+      </div>
+    </li>
+
+    <li>
+      <h3>4 · Notification types</h3>
+      <p>
+        Tick every type you want in Seerr — it decides what gets sent at all, and the
+        <strong>Who gets what</strong> tab decides who receives each one. A type unticked in Seerr never arrives here.
+      </p>
+      <p>
+        Then press <strong>Test</strong>. Note that Seerr's test payload is byte-identical every time, so a second
+        press inside the de-duplication window is answered <code>200 duplicate</code> and delivers nothing — that is
+        the gateway protecting you from replayed webhooks, not a fault. Use <code>send-test.mjs</code> from the
+        repository to test repeatedly, or with any event type.
+      </p>
+    </li>
+  </ol>
+</section>
+
+<section id="panel-connection" role="tabpanel" aria-labelledby="tab-connection" hidden>
   <h2>Seerr connection</h2>
   <p class="hint">Used to enrich notifications with overview, ratings, cast and season status. Leave blank to format from the webhook payload alone. Use the health-check button on the plugin row to test these settings.</p>
   <div class="field">
@@ -218,6 +343,14 @@
       <small>Log each delivery: event type, recipient count, masked chat ids, send outcomes. Never logs message bodies.</small>
     </div>
   </div>
+  <div class="check">
+    <input type="checkbox" id="updateCheckEnabled" />
+    <div>
+      <label for="updateCheckEnabled">Check GitHub for new releases</label>
+      <small>Once a day, ask github.com whether a newer release exists and show a banner if so. Nothing is downloaded or installed. Off = no outbound request is ever made.</small>
+      <small><button type="button" class="linkish" id="checkUpdate">Check now</button> <span id="updateMeta"></span></small>
+    </div>
+  </div>
   <div class="field">
     <label for="fallbackSessionId">Fallback WhatsApp session</label>
     <input type="text" id="fallbackSessionId" placeholder="(optional)" />
@@ -235,7 +368,7 @@
   'use strict';
 
   var SCALARS = ['jellyseerrUrl', 'jellyseerrApiKey', 'fallbackSessionId'];
-  var BOOLEANS = ['enrichmentEnabled', 'requireMappedUser', 'sendPoster', 'debug'];
+  var BOOLEANS = ['enrichmentEnabled', 'requireMappedUser', 'sendPoster', 'debug', 'updateCheckEnabled'];
 
   var el = function (id) { return document.getElementById(id); };
   var saveBtn = el('save');
@@ -244,6 +377,187 @@
   var userRows = el('userRows');
   /** Round-tripped unchanged on an ordinary save; re-stamped only by "Refresh from Seerr". */
   var refreshToken = '';
+  /**
+   * The Setup tab's state, written by the plugin and round-tripped verbatim here. The editor changes
+   * exactly one field of it — clearing the secret — and never invents the rest: it has no network, so
+   * ingress URLs, the secret and the release check can only come from the plugin.
+   */
+  var setup = {};
+  /** Stamped by a Setup button, cleared by the plugin once the action has run. */
+  var setupToken = '';
+  /** Which button is waiting on a plugin round trip, so config:saved can say what happens next. */
+  var pending = '';
+
+  // ── Clipboard ───────────────────────────────────────────────────────────
+  // The frame is sandboxed with an opaque origin and (over plain http) is not a secure context, so
+  // navigator.clipboard is frequently absent or rejects. execCommand is the fallback that does work
+  // here; if both fail the text is left selected, which is the one thing that always works.
+  function copyText(text, button, sourceInput) {
+    var done = function (ok) {
+      if (!button) return;
+      var original = button.getAttribute('data-label') || button.textContent;
+      button.setAttribute('data-label', original);
+      button.textContent = ok ? 'Copied' : 'Press Ctrl+C';
+      setTimeout(function () { button.textContent = original; }, 1600);
+    };
+
+    var scratch = sourceInput;
+    if (!scratch) {
+      scratch = document.createElement('input');
+      scratch.value = text;
+      scratch.style.position = 'fixed';
+      scratch.style.opacity = '0';
+      document.body.appendChild(scratch);
+    }
+    scratch.focus();
+    scratch.select();
+    scratch.setSelectionRange(0, text.length);
+
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+    if (!sourceInput) document.body.removeChild(scratch);
+
+    if (ok) { done(true); return; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+        return;
+      }
+    } catch (err) { /* fall through to the selection fallback */ }
+    done(false);
+  }
+
+  // ── Setup tab ───────────────────────────────────────────────────────────
+  function copyLine(tag, text) {
+    var line = document.createElement('div');
+    line.className = 'copyline';
+
+    var label = document.createElement('span');
+    label.className = 'tag';
+    label.textContent = tag;
+
+    var value = document.createElement('code');
+    value.textContent = text;
+
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'mini';
+    button.textContent = 'Copy';
+    button.addEventListener('click', function () { copyText(text, button); });
+
+    line.appendChild(label);
+    line.appendChild(value);
+    line.appendChild(button);
+    return line;
+  }
+
+  function renderInstances() {
+    var list = el('instanceList');
+    var picker = el('secretInstance');
+    var instances = Array.isArray(setup.instances) ? setup.instances : [];
+    list.innerHTML = '';
+    picker.innerHTML = '';
+
+    if (instances.length === 0) {
+      var none = document.createElement('div');
+      none.className = 'note';
+      none.innerHTML =
+        '<strong>No ingress instance exists yet.</strong> One has to be created before Seerr has anywhere to post. ' +
+        'Run this on the OpenWA host, with an admin API key — the response contains both the URL and the secret, ' +
+        'so if you create it this way you can skip step 2:';
+      list.appendChild(none);
+      list.appendChild(copyLine(
+        'curl',
+        "curl -sX POST http://localhost:2785/api/integration/plugins/seerr-notify/instances " +
+        "-H 'X-API-Key: <admin key>' -H 'Content-Type: application/json' " +
+        '-d \'{"instanceId":"seerr-prod"}\''
+      ));
+      el('generateSecret').disabled = true;
+      picker.hidden = true;
+      return;
+    }
+
+    instances.forEach(function (instance) {
+      var url = instance.url || '';
+      // buildIngressUrls returns a bare path when the gateway has no BASE_URL — the host is the
+      // operator's to supply, and guessing it here would hand Seerr a URL that silently never connects.
+      var shown = instance.relative ? 'http://<your-openwa-host>:2785' + url : url;
+      var line = copyLine(instance.instanceId, shown);
+      if (instance.enabled === false) {
+        var off = document.createElement('span');
+        off.className = 'tag warn';
+        off.textContent = 'instance disabled';
+        line.appendChild(off);
+      }
+      list.appendChild(line);
+
+      var option = document.createElement('option');
+      option.value = instance.instanceId;
+      option.textContent = instance.instanceId;
+      picker.appendChild(option);
+    });
+
+    var relative = instances.some(function (instance) { return instance.relative; });
+    var scoped = instances.filter(function (instance) { return instance.sessionScope; });
+    var notes = [];
+    if (relative) notes.push('Set BASE_URL on the gateway to have the full URL filled in here.');
+    if (scoped.length) notes.push(scoped.length + ' instance(s) are bound to a single WhatsApp session.');
+    if (notes.length) {
+      var hint = document.createElement('p');
+      hint.style.margin = '4px 0 0';
+      hint.style.fontSize = '12px';
+      hint.className = 'hint';
+      hint.textContent = notes.join(' ');
+      list.appendChild(hint);
+    }
+
+    picker.hidden = instances.length < 2;
+    el('generateSecret').disabled = false;
+    if (setup.secretFor) picker.value = setup.secretFor;
+  }
+
+  function renderSetup() {
+    renderInstances();
+
+    var secret = typeof setup.secret === 'string' ? setup.secret : '';
+    el('ingressSecret').value = secret;
+    el('copySecret').disabled = secret === '';
+    el('clearSecret').disabled = secret === '';
+    el('secretMeta').textContent = secret
+      ? 'Shown once. Copy it into Seerr, then clear it from here.'
+      : (setup.secretFor ? 'Cleared. Generate again if you need it.' : '');
+
+    var update = setup.update || null;
+    el('updateMeta').textContent = !update
+      ? 'Never checked.'
+      : 'Checked ' + new Date(update.checkedAt).toLocaleString() +
+        (update.available ? ' — v' + update.latest + ' available.' : (update.note ? ' — ' + update.note + '.' : '.'));
+
+    el('instanceMeta').textContent = setup.instancesAt
+      ? 'Read from the gateway at ' + new Date(setup.instancesAt).toLocaleString()
+      : 'Not read yet.';
+
+    if (setup.error) showFeedback(setup.error, false);
+
+    var banner = el('updateBanner');
+    banner.hidden = !(update && update.available);
+    if (update && update.available) {
+      el('updateLatest').textContent = 'v' + update.latest;
+      el('updateCurrent').textContent = 'v' + update.current;
+      el('updateUrl').textContent = update.url;
+    }
+  }
+
+  // Same mechanism as "Refresh from Seerr": the editor cannot fetch, so it saves a token the plugin
+  // acts on. The plugin's write-back is not visible until the dashboard reloads, which is what the
+  // message says — the values are durable in config, so they are there after the reload.
+  function requestSetup(action, arg, label) {
+    setupToken = action + '|' + (arg || '') + '|' + new Date().toISOString();
+    pending = label;
+    saveBtn.disabled = true;
+    showFeedback('', true);
+    parent.postMessage({ type: 'config:save', config: assembleConfig() }, '*');
+  }
 
   // ── Tabs ────────────────────────────────────────────────────────────────
   var tabs = [].slice.call(document.querySelectorAll('[role="tab"]'));
@@ -459,6 +773,12 @@
     rosterSyncedAt = typeof cfg.rosterSyncedAt === 'string' ? cfg.rosterSyncedAt : '';
     refreshToken = typeof cfg.rosterRefreshRequestedAt === 'string' ? cfg.rosterRefreshRequestedAt : '';
 
+    setup = cfg.setup && typeof cfg.setup === 'object' ? cfg.setup : {};
+    // Normally '' — the plugin clears it once the action has run. A non-empty value here means an action
+    // is still in flight, and re-sending it verbatim is harmless: the plugin ignores a token it has done.
+    setupToken = typeof cfg.setupRequestedAt === 'string' ? cfg.setupRequestedAt : '';
+    renderSetup();
+
     // Stored routing layered over the defaults, so a config saved before this tab existed — or one
     // missing a cell — still renders complete rules rather than blanks.
     resetRouting();
@@ -517,6 +837,10 @@
     cfg.rosterSyncedAt = rosterSyncedAt;
     cfg.rosterRefreshRequestedAt = refreshToken;
     cfg.routing = routing;
+    // Written back verbatim for the same reason as the roster: the plugin owns this key, and dropping it
+    // here would erase the ingress URLs and the update check on the next ordinary save.
+    cfg.setup = setup;
+    cfg.setupRequestedAt = setupToken;
     return cfg;
   }
 
@@ -552,14 +876,18 @@
       applyTheme(data.theme);
       populateConfig(data.config);
     } else if (data.type === 'config:saved') {
-      if (refreshBtn.disabled) {
+      if (pending) {
+        showFeedback(pending + ' Reload the dashboard in a few seconds to see the result.', true);
+        pending = '';
+      } else if (refreshBtn.disabled) {
         showFeedback('Fetching from Seerr… reload this page in a few seconds to see the list.', true);
-        refreshBtn.disabled = false;
       } else {
         showFeedback('Saved.', true);
       }
+      refreshBtn.disabled = false;
       saveBtn.disabled = false;
     } else if (data.type === 'config:error') {
+      pending = '';
       refreshBtn.disabled = false;
       showFeedback(data.message || 'Save failed.', false);
       saveBtn.disabled = false;
@@ -569,19 +897,84 @@
   saveBtn.addEventListener('click', function () {
     var cfg = assembleConfig();
     var live = cfg.users.filter(function (m) { return m.enabled && m.number !== ''; });
-    if (live.length === 0) {
-      showFeedback('Enable at least one recipient and give them a WhatsApp number.', false);
-      return;
-    }
     saveBtn.disabled = true;
     showFeedback('', true);
     parent.postMessage({ type: 'config:save', config: cfg }, '*');
+    // Saved either way — a first-run operator has to save the Seerr URL before a roster refresh can find
+    // anyone to map, so this is a warning about what will not be delivered yet, not a refusal.
+    if (live.length === 0) {
+      showFeedback('Saved. Nothing can be delivered yet: enable a recipient and give them a WhatsApp number.', false);
+    }
   });
 
   el('userFilter').addEventListener('input', applyFilter);
   el('enabledOnly').addEventListener('change', applyFilter);
   refreshBtn.addEventListener('click', requestRefresh);
   el('routingReset').addEventListener('click', resetRouting);
+
+  // ── Setup tab wiring ────────────────────────────────────────────────────
+  [].slice.call(document.querySelectorAll('[data-copy-text]')).forEach(function (button) {
+    button.addEventListener('click', function () { copyText(button.getAttribute('data-copy-text'), button); });
+  });
+
+  el('copySecret').addEventListener('click', function () {
+    copyText(el('ingressSecret').value, el('copySecret'), el('ingressSecret'));
+  });
+
+  // Clearing is the one part of `setup` the editor writes itself: it is a plain field edit followed by an
+  // ordinary save, with no plugin round trip and nothing to wait for.
+  el('clearSecret').addEventListener('click', function () {
+    setup.secret = '';
+    renderSetup();
+    saveBtn.disabled = true;
+    parent.postMessage({ type: 'config:save', config: assembleConfig() }, '*');
+    showFeedback('Secret cleared from the plugin config.', true);
+  });
+
+  el('refreshInstances').addEventListener('click', function () {
+    requestSetup('instances', '', 'Reading the ingress instances…');
+  });
+
+  el('checkUpdate').addEventListener('click', function () {
+    requestSetup('update', '', 'Asking GitHub for the latest release…');
+  });
+
+  el('copyUpdateUrl').addEventListener('click', function () {
+    copyText(el('updateUrl').textContent, el('copyUpdateUrl'));
+  });
+
+  // Two clicks, because this breaks a working webhook until the new value reaches Seerr — and because a
+  // sandboxed frame has no confirm() to fall back on (modals need allow-modals, which it is not given).
+  var armed = null;
+  el('generateSecret').addEventListener('click', function () {
+    var button = el('generateSecret');
+    var picker = el('secretInstance');
+    var instances = Array.isArray(setup.instances) ? setup.instances : [];
+    var target = picker.hidden ? (instances[0] || {}).instanceId : picker.value;
+    if (!target) return;
+
+    if (armed !== target) {
+      armed = target;
+      button.classList.add('armed');
+      button.textContent = 'Replace the secret for "' + target + '"?';
+      el('secretWarning').hidden = false;
+      // Disarm on its own, so an armed button left alone cannot be triggered by a stray later click.
+      setTimeout(function () {
+        if (armed !== target) return;
+        armed = null;
+        button.classList.remove('armed');
+        button.textContent = 'Generate a new secret';
+        el('secretWarning').hidden = true;
+      }, 10000);
+      return;
+    }
+
+    armed = null;
+    button.classList.remove('armed');
+    button.textContent = 'Generate a new secret';
+    el('secretWarning').hidden = true;
+    requestSetup('secret', target, 'Rotating the ingress secret…');
+  });
 
   parent.postMessage({ type: 'config:get' }, '*');
 })();

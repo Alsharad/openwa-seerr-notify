@@ -22,6 +22,10 @@ project's [plugin standard](https://github.com/rmyndharis/OpenWA-plugins/blob/ma
 
 ## Features
 
+- **A Setup tab that does the fiddly parts** — reads the webhook URL back from the gateway so you paste
+  rather than assemble it, generates the `X-Seerr-Token` secret, and says exactly what to set in Seerr.
+- **Tells you when there is a new release** — a daily GitHub check and a banner; nothing is downloaded,
+  and it switches off in one click.
 - **Routing you control** — a clickable matrix of every Seerr `notification_type` against requester,
   admins, and whether admins get the Admin Info block. Defaults to the sensible thing: requesters hear
   about their own requests, admins hear about anything they may need to act on.
@@ -70,23 +74,17 @@ letters are owned by the plugin instead.
 
 ## Setup
 
+Most of this is done for you by the **Setup** tab, which is the first thing the config screen opens on.
+It shows the webhook URL read back from the gateway, generates the header secret, and spells out what to
+set in Seerr. The full path:
+
 1. **Have a WhatsApp session running** in OpenWA, and note its session id.
 2. **Create a Seerr API key** (Jellyseerr/Overseerr → Settings → General → API Key) if you want
    enrichment. Without it the plugin still delivers, using only what the webhook payload contains.
-3. **Allow the Seerr host for outbound calls**, if you want enrichment. Two gates apply, and a
-   self-hosted Seerr on a private address needs both:
-   - **`net.allow`** in this plugin's `manifest.json`. `net.allowConfigHosts` already admits
-     `jellyseerrUrl` automatically, but **only when it is an `https` URL** — a plain-`http` LAN address is
-     ignored, so add the host yourself: `"net": { "allow": ["192.168.1.50:5055"], ... }`.
-   - **`SSRF_ALLOWED_HOSTS`** in the OpenWA environment. The host's SSRF guard blocks every RFC1918
-     address regardless of `net.allow`: `SSRF_ALLOWED_HOSTS=192.168.1.50`.
-
-   Get either wrong and enrichment silently no-ops — messages still arrive, without the detail. The
-   plugin logs `Seerr API request failed` when this is the cause.
-4. **Install the plugin** (below), open **Configure → Recipients**, hit **Refresh from Seerr**, reload
-   the page, then enable the people you want and give them WhatsApp numbers. Enabling the plugin fails
-   with `no recipients enabled` until at least one is — it has nothing to do otherwise.
-5. **Provision an ingress instance** and copy the secret it returns (shown **once**):
+3. **Install and enable the plugin** (below). It enables with an empty config — there is nothing to
+   configure before it is running, and the buttons that fetch things only work while it *is* running.
+4. **Provision an ingress instance**, if you have not got one. This is the one step with no button,
+   because it needs an admin API key the config screen never sees:
 
    ```bash
    curl -X POST http://<openwa-host>:2785/api/integration/plugins/seerr-notify/instances \
@@ -94,14 +92,39 @@ letters are owned by the plugin instead.
      -d '{"instanceId":"seerr-prod","sessionScope":"<your-session-id>"}'
    ```
 
-   The response carries `secret` and the `ingressUrls[].url` for the `seerr` route. `CreateInstanceDto`
-   is strictly validated — an extra field such as `enabled` is rejected with a `400`. When `BASE_URL` is
-   unset the URL comes back relative; prefix it with your own host.
-6. **Point Seerr at it** — Jellyseerr/Overseerr → Settings → Notifications → Webhook:
-   - **Webhook URL**: the `ingressUrls[].url` from step 5
-     (`http://<openwa-host>:2785/api/ingress/seerr-notify/seerr-prod/seerr`)
-   - **Custom header**: key `X-Seerr-Token`, value the `secret` from step 5
-   - Leave the default JSON payload template as-is, and tick the notification types you want.
+   The response carries the ingress `secret` and the `ingressUrls[].url` — **both shown once**. If you
+   keep them, you can skip the secret generation in step 6. `CreateInstanceDto` is strictly validated:
+   an extra field such as `enabled` is rejected with a `400`.
+5. **Open Configure → Connection**, fill in the Seerr URL and API key, and Save. Use the health-check
+   button on the plugin row to confirm — it reports the Seerr version and whether the key was accepted,
+   and it works before any recipient exists.
+6. **Configure → Setup** now shows the webhook URL to paste into Seerr. If you did not keep the secret
+   from step 4, press **Generate a new secret** (twice — it asks), reload the dashboard, and copy the
+   value it shows. Clear it once Seerr has it.
+7. **Point Seerr at it** — Jellyseerr/Overseerr → Settings → Notifications → Webhook:
+   - **Enable Agent**: on
+   - **Webhook URL**: the URL from the Setup tab
+   - **Custom header**: name `X-Seerr-Token`, value the secret. Leave **Authorization Header** empty.
+   - **JSON Payload**: leave it at Seerr's default — press **Reset to Default** if you have edited it.
+     Every field the plugin reads comes from that template. Extra fields are ignored, so a template that
+     only *adds* things is fine.
+   - Tick the notification types you want. Seerr decides what is sent at all; the **Who gets what** tab
+     decides who receives each one.
+8. **Configure → Recipients**, press **Refresh from Seerr**, reload the page, then enable the people you
+   want and give them WhatsApp numbers. Nothing is delivered until at least one recipient exists — the
+   health check says so, and an arriving notification is dropped with that reason in the log.
+
+### Reaching a self-hosted Seerr
+
+The manifest declares `net.allow: ["*"]`. That is not laziness: the host only auto-admits a config URL
+through `net.allowConfigHosts` when it is **https** (core `plugin-net.ts`, `effectiveNetAllow`), and a
+self-hosted Seerr is almost always `http://192.168.x.x:5055`. With a fixed host list, every such install
+fails with `Plugin seerr-notify may not fetch …` and the only fix is unzipping the package to edit the
+manifest. The real gate stays where the operator can reach it: OpenWA's SSRF guard, and
+`SSRF_ALLOWED_HOSTS` when the guard blocks a private address.
+
+If enrichment silently no-ops — messages arrive without overview, ratings or cast — run the health check.
+It names the cause.
 
 ## Install
 
@@ -116,9 +139,19 @@ curl -X POST http://<openwa-host>:2785/api/plugins/seerr-notify/enable \
   -H "X-API-Key: <ADMIN_KEY>"
 ```
 
-Then open **Configure** and work through the tabs — Connection, Recipients, Who gets what, Options.
-Enabling fails until at least one recipient is enabled with a WhatsApp number, which is deliberate: the
-plugin has nothing to do without one.
+Then open **Configure** and work through the tabs — Setup, Connection, Recipients, Who gets what,
+Options. The plugin enables with an empty config; the health check and the log tell you what is still
+missing.
+
+### Updates
+
+Once a day the plugin asks GitHub whether a newer release exists, and the config screen shows a banner
+with the release URL when there is one. Nothing is downloaded or installed — updating stays your
+decision, and the same API call you installed with is how you take it. Switch the check off entirely
+with **Options → Check GitHub for new releases**, or run it on demand with **Check now**.
+
+The banner shows the URL rather than a clickable link: the config screen is a sandboxed iframe with no
+`allow-popups`, so a link there cannot open anything. Copy it.
 
 ### Testing it
 
@@ -161,7 +194,7 @@ are listed because they are what the REST API and any backup will show you.
 
 | Key | Required | Default | Description |
 | --- | -------- | ------- | ----------- |
-| `users` | **yes** | `[]` | Recipient mappings, one per notified Seerr account: `{ seerrUserId, number, enabled }`. Identity and admin status come from `seerrRoster`, not from here. Enabling fails while none is enabled with a number. |
+| `users` | **yes** | `[]` | Recipient mappings, one per notified Seerr account: `{ seerrUserId, number, enabled }`. Identity and admin status come from `seerrRoster`, not from here. Nothing is delivered while none is enabled with a number. |
 | `jellyseerrUrl` | no | `""` | Seerr base URL. Empty disables enrichment. See the two allowlist gates in **Setup**. |
 | `jellyseerrApiKey` | no | `""` | Seerr API key (stored masked). Empty disables enrichment. |
 | `enrichmentEnabled` | no | `true` | Master switch for Seerr API calls. Enrichment needs this **and** a URL **and** a key. |
@@ -172,7 +205,17 @@ are listed because they are what the REST API and any backup will show you.
 | `seerrRoster` | no | `[]` | Cached Seerr accounts (`{ id, name, email, isAdmin }`) so the editor can list them. Written by the Refresh button or `refresh-roster.mjs`. |
 | `rosterSyncedAt` | no | `""` | ISO timestamp of the last roster refresh. |
 | `rosterRefreshRequestedAt` | no | `""` | Token stamped by the Refresh button; changing it is what asks the plugin to refetch. Not edited by hand. |
+| `setup` | no | `{}` | Written by the plugin for the **Setup** tab: the ingress instances and their URLs, the last generated ingress secret, and the update check. Not edited by hand — but see the note below about the secret. |
+| `setupRequestedAt` | no | `""` | Token stamped by a Setup button as `<action>\|<arg>\|<timestamp>`, and cleared by the plugin once the action has run. Not edited by hand. |
+| `updateCheckEnabled` | no | `true` | Ask GitHub once a day whether a newer release exists. Off = no outbound request is ever made. |
 | `debug` | no | `false` | Log one line per delivery with masked chat ids. Never logs message bodies. |
+
+`setup.secret` holds the plaintext ingress secret from the last **Generate a new secret**, until you
+clear it. That is deliberate and it is the only way the value can reach you: the gateway reveals an
+ingress secret exactly once, in the response to the call that mints it, and a config field flagged
+`secret` arrives at the config screen as `***`. It is the credential for one ingress route, readable only
+by an admin API key — the same key class that could rotate it anyway. Copy it into Seerr and press
+**Clear**.
 
 Every **Now Available** section — overview, rating, runtime, genres, director/creator, top cast, trailer,
 seasons, collection — is always on. These were nine separate toggles until v1.2.0; that was more
@@ -234,21 +277,34 @@ restart. Nothing is cached across deliveries.
   four digits; message bodies are never logged, at any log level.
 - **The worker is crash containment, not a security boundary** — as OpenWA's own docs state. Plugin code
   keeps `require('fs')` and raw sockets whatever the manifest declares.
-- **⚠️ The Refresh button steps outside the plugin capability model.** Nothing in the supported surface
-  lets a plugin write its own config: the editor is an opaque-origin sandbox with no network whose only
-  channel speaks `config:get` / `config:save`, and `PluginContext.config` is a read-only getter. The only
-  writer is `PUT /api/plugins/:id/config`, which requires an ADMIN, unscoped key. So the button reads the
-  gateway's own key from `/app/data/.api-key` and calls that endpoint. Specifically:
+- **`net.allow` is `["*"]`**, because the host only auto-admits an `https` config URL and a self-hosted
+  Seerr is almost never https — see *Reaching a self-hosted Seerr*. The plugin fetches exactly two kinds
+  of host: the Seerr URL you configured, and `api.github.com` for the release check (which you can switch
+  off). The SSRF guard still refuses private addresses unless `SSRF_ALLOWED_HOSTS` says otherwise.
+- **⚠️ The Refresh button and the Setup tab step outside the plugin capability model.** Nothing in the
+  supported surface lets a plugin write its own config: the editor is an opaque-origin sandbox with no
+  network whose only channel speaks `config:get` / `config:save`, and `PluginContext.config` is a
+  read-only getter. The only writer is `PUT /api/plugins/:id/config`, which requires an ADMIN, unscoped
+  key. So the plugin reads the gateway's own key from `/app/data/.api-key` and calls that endpoint —
+  `gateway.ts` is the whole of it. Specifically:
   - the key is read at call time, **never copied into config**, never logged, and never leaves the process;
   - the self-call is **loopback-only** and uses Node's `fetch`, not `ctx.net.fetch` — widening
     `SSRF_ALLOWED_HOSTS` to admit `127.0.0.1` would open loopback to *every* plugin on the host;
-  - the write sends **only the three roster keys**, and the host merges config shallowly, so no other
+  - the write sends **only the keys that action owns**, and the host merges config shallowly, so no other
     setting (the Seerr API key included) is touched;
-  - it is triggered only by an operator clicking the button, never on a timer.
+  - every action is operator-triggered, with one exception: a single background pass ~10 s after the
+    plugin is enabled, which reads the ingress instance list and (at most once a day, and only while
+    `updateCheckEnabled` is on) checks GitHub. It writes nothing when it has nothing.
 
-  If you would rather no plugin on your host could do this, delete `roster-refresh.ts` and the
-  `onConfigChange` handler in `index.ts` and use `refresh-roster.mjs`, which takes the key from the
-  environment of whoever runs it. Everything else works unchanged.
+  It also means anything the plugin can be made to write, it writes as an admin. That is why the Setup
+  action token is validated as one of three literal names with a pattern-checked instance id, and why the
+  token is cleared rather than echoed — a stale `secret|…` left in config would otherwise rotate your
+  ingress secret again after an unrelated restart.
+
+  If you would rather no plugin on your host could do this, delete `gateway.ts`, `setup.ts`,
+  `roster-refresh.ts` and the `onConfigChange` handler in `index.ts`, and use `refresh-roster.mjs`, which
+  takes the key from the environment of whoever runs it. You lose the Setup tab and the update banner;
+  everything on the delivery path works unchanged.
 
 ## Changelog
 

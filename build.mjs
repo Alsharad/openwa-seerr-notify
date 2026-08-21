@@ -52,8 +52,12 @@ await build({
   format: 'cjs',
   target: 'node22',
   outfile: join(ROOT, 'dist', 'index.js'),
-  // The sandbox does not pass `manifest` into ctx, so the version is baked in at build time.
-  define: { __PLUGIN_VERSION__: JSON.stringify(manifest.version) },
+  // The sandbox does not pass `manifest` into ctx, so the version and repository are baked in at build
+  // time — the version for logs and the update check's comparison, the repository for what it asks about.
+  define: {
+    __PLUGIN_VERSION__: JSON.stringify(manifest.version),
+    __PLUGIN_REPO__: JSON.stringify(manifest.repository ?? manifest.homepage ?? ''),
+  },
 });
 
 // ── Package ──────────────────────────────────────────────────────────────────
