@@ -347,7 +347,7 @@ between "not available" and "not wanted".
 | `showOverview` | The plot summary, in italics | Also governs **Request Submitted** |
 | `showRating` | `⭐ 7.1/10` | IMDb critics score, else Rotten Tomatoes, else TMDB's vote average |
 | `showRuntime` | `⏱ 100 min` | A series uses the first entry of `episodeRunTime` |
-| `showReleaseDate` | `📅 2004-11-10` | Release date, or first air date for a series |
+| `showReleaseDate` | `📅 2004-11-10` | Release date, or first air date for a series. **Off** folds the year into the title instead — `*PAW Patrol: The Movie (2021)*` — rather than dropping it |
 | `showGenres` | `🎭 Animation, Family` | Also governs **Request Submitted** |
 | `showCast` | A **Cast** block | The top five billed, with their character names |
 | `showDirector` | `🎬 Robert Zemeckis` | For a series, the creator instead (`✍️`) |

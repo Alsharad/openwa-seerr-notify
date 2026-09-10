@@ -64,6 +64,22 @@ function buildIssueAdminLines(issueId: string | null, issueType: string | null):
   return lines;
 }
 
+/**
+ * The title line, with the year folded in when the full date line is switched off.
+ *
+ * Switching Release date off does not throw the year away, it moves it: "PAW Patrol: The Movie (2021)",
+ * which is how anyone reading a film title expects to see it. The switch therefore chooses between a
+ * whole 📅 line and the one part of the date that actually disambiguates — a remake from its original —
+ * rather than between having the date and not.
+ */
+function titleWithYear(title: string, rawDate: string, showReleaseDate: boolean): string {
+  if (showReleaseDate) return title;
+  const year = /^(\d{4})/.exec(rawDate)?.[1];
+  // A Seerr title sometimes already carries its year; "(2021) (2021)" reads as a bug, not as a date.
+  if (!year || title.endsWith(`(${year})`)) return title;
+  return `${title} (${year})`;
+}
+
 function formatMediaAvailable(event: NormalizedEvent, f: ContentFlags): string {
   const details = event.mediaDetails;
   const movie = event.mediaType === 'movie';
@@ -76,7 +92,7 @@ function formatMediaAvailable(event: NormalizedEvent, f: ContentFlags): string {
 
   const title = details.title || details.name || event.subject;
   const rawDate = (details.releaseDate || details.firstAirDate || '').split('T')[0];
-  const lines: string[] = ['✅ Now Available', `*${title}*`];
+  const lines: string[] = ['✅ Now Available', `*${titleWithYear(title, rawDate, f.showReleaseDate)}*`];
 
   if (f.showReleaseDate && rawDate) lines.push(`📅 ${rawDate}`);
 

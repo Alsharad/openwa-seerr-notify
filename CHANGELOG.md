@@ -7,6 +7,20 @@ All notable changes to this plugin are documented here. The format follows
 ## [Unreleased]
 
 
+## [1.22.0] - 2026-09-10
+
+### Changed
+
+- **Switching Release date off now folds the year into the title** — `*PAW Patrol: The Movie (2021)*`
+  — instead of dropping the date entirely. The switch chooses between a whole `📅 2021-08-09` line and
+  the one part of the date that actually disambiguates a remake from its original, rather than between
+  having the date and not having it. A series uses its first air date. A title Seerr already delivered
+  with its year, or one with no usable date, is left alone rather than doubled.
+
+  Consequence worth knowing: there is now no setting that removes the year from a Now Available message
+  altogether. If that is wanted it needs a third state, not a boolean.
+
+
 ## [1.21.0] - 2026-09-10
 
 ### Added

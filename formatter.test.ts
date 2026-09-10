@@ -77,9 +77,49 @@ test('MEDIA_AVAILABLE renders every enabled section', () => {
   assert.match(userMessage, /Part of: \*Christmas Collection\*/);
 });
 
-test('every section can be switched off, leaving only the headline', () => {
+test('every section can be switched off, leaving the headline and a titled year', () => {
   const { userMessage } = formatMessages(available({ mediaDetails: movieDetails }), allOff);
-  assert.equal(userMessage, '✅ Now Available\n*The Polar Express*');
+  assert.equal(userMessage, '✅ Now Available\n*The Polar Express (2004)*');
+});
+
+test('switching Release date off moves the year into the title', () => {
+  const event = available({ mediaDetails: movieDetails });
+
+  const on = formatMessages(event, allOn).userMessage;
+  assert.match(on, /\*The Polar Express\*/);
+  assert.match(on, /📅 2004-11-10/);
+
+  const off = formatMessages(event, { ...allOn, showReleaseDate: false }).userMessage;
+  assert.match(off, /\*The Polar Express \(2004\)\*/);
+  assert.doesNotMatch(off, /📅/);
+  // The year replaces the date line rather than joining it — that is the whole trade.
+  assert.doesNotMatch(off, /2004-11-10/);
+});
+
+test('a title with no usable year, or one that already carries it, is left alone', () => {
+  const flags = { ...allOn, showReleaseDate: false };
+
+  const undated = available({ mediaDetails: { ...movieDetails, releaseDate: undefined } });
+  assert.match(formatMessages(undated, flags).userMessage, /\*The Polar Express\*/);
+
+  // Seerr hands back a malformed date rather than none at all often enough to be worth not parsing.
+  const junk = available({ mediaDetails: { ...movieDetails, releaseDate: 'soon' } });
+  assert.match(formatMessages(junk, flags).userMessage, /\*The Polar Express\*/);
+
+  // Doubling it would read as a bug, not as a date.
+  const titled = available({ mediaDetails: { ...movieDetails, title: 'The Polar Express (2004)' } });
+  const message = formatMessages(titled, flags).userMessage;
+  assert.match(message, /\*The Polar Express \(2004\)\*/);
+  assert.doesNotMatch(message, /\(2004\) \(2004\)/);
+});
+
+test('a series uses its first air date for the titled year', () => {
+  const tv = normalizePayload({ notification_type: 'MEDIA_AVAILABLE', subject: 'Show', media: { media_type: 'tv' } });
+  tv.mediaDetails = { name: 'Severance', firstAirDate: '2022-02-18' };
+  assert.match(
+    formatMessages(tv, { ...allOn, showReleaseDate: false }).userMessage,
+    /\*Severance \(2022\)\*/,
+  );
 });
 
 test('a rating from the ratings API outranks the TMDB vote average', () => {
