@@ -6,6 +6,28 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The repository is organized into folders.** Thirty-nine files sat in the root, which made finding
+  anything a matter of already knowing its name. Source now lives under `src/`, grouped by what it does
+  — `settings/`, `seerr/`, `notify/`, `panel/`, `host/`, `types/` — with the four `.mjs` tools under
+  `scripts/`. Tests sit beside what they test.
+
+  Dependencies were already acyclic and stayed that way: `index.ts` → `panel/` → `notify/` →
+  `settings/` + `seerr/`, with `settings/` importing nothing outside itself and `host/` importing
+  nothing at all. `src/layout.test.ts` now asserts that direction, so a sideways import fails the build
+  instead of quietly eroding the arrangement. The README carries the map, and the same test fails if
+  the map and the disk disagree.
+
+  `config/index.html` deliberately stays at the repository root: the build packages it by its top-level
+  directory name, so moving it would have meant a special case in `build.mjs` for no gain. The packaged
+  zip still contains exactly `manifest.json`, `dist/index.js`, `dist/package.json` and
+  `config/index.html`.
+
+  No version bump: no release is being cut, and the only difference in a rebuilt bundle is the source
+  paths esbuild writes into its own provenance comments. Rebuilding tag `v1.22.1` still reproduces the
+  published asset byte for byte, because that tag predates this commit.
+
 
 ## [1.22.1] - 2026-09-10
 

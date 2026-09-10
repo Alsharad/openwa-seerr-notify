@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { ConversationSendEnvelope } from './types/openwa';
+import type { ConversationSendEnvelope } from '../types/openwa';
 import { MAX_CAPTION, MAX_TEXT, isHostTimeout, partToEnvelope, planSends, sendWithRetry, splitText } from './deliver.ts';
 
 const POSTER = 'https://image.tmdb.org/t/p/w600/poster.jpg';

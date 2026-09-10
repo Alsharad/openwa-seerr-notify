@@ -14,21 +14,21 @@
 // failed" row, and no redrive re-running a handler that already sent — which would deliver the same
 // notification twice.
 
-import type { PluginStorage, WebhookRequest } from './types/openwa';
-import type { SeerrConfig } from './config.ts';
-import { maskChatId } from './config.ts';
-import { normalizePayload, validatePayload } from './normalize.ts';
-import type { NormalizedEvent } from './normalize.ts';
+import type { PluginStorage, WebhookRequest } from '../types/openwa';
+import type { SeerrConfig } from '../settings/config.ts';
+import { maskChatId } from '../settings/config.ts';
+import { normalizePayload, validatePayload } from '../seerr/normalize.ts';
+import type { NormalizedEvent } from '../seerr/normalize.ts';
 import { resolveRecipients } from './recipients.ts';
 import { formatMessages } from './formatter.ts';
-import { routingFor } from './routing.ts';
-import { enrich } from './seerr-client.ts';
-import type { NetFetch } from './seerr-client.ts';
+import { routingFor } from '../settings/routing.ts';
+import { enrich } from '../seerr/seerr-client.ts';
+import type { NetFetch } from '../seerr/seerr-client.ts';
 import { partToEnvelope, planSends, sendWithRetry } from './deliver.ts';
 import type { SendDeps } from './deliver.ts';
 import { recordDeadLetter } from './deadletter.ts';
 import type { DeadLetterDeps } from './deadletter.ts';
-import type { SessionChoice } from './session-resolve.ts';
+import type { SessionChoice } from '../host/session-resolve.ts';
 
 /** Event types that carry a poster worth attaching. Elsewhere the image adds nothing. */
 const POSTER_TYPES = new Set(['MEDIA_AVAILABLE', 'MEDIA_PENDING']);

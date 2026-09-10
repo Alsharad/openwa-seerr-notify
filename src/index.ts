@@ -1,18 +1,18 @@
 import type { IPlugin, PluginContext } from './types/openwa';
-import { readConfig, readSeerrConnection } from './config.ts';
-import type { SeerrConfig } from './config.ts';
-import { handleSeerrWebhook } from './handler.ts';
-import { describeSending, resolveSessionForTest, resolveSessionId } from './session-resolve.ts';
-import { sendTestMessage } from './test-send.ts';
-import type { GatewayDeps } from './gateway.ts';
-import type { HandlerDeps } from './handler.ts';
-import { readDeadLetters } from './deadletter.ts';
-import { probeSeerr } from './probe.ts';
-import { API_KEY_FILE_CANDIDATES, refreshRoster } from './roster-refresh.ts';
-import { parseSetupAction, readSetup, refreshSetupInBackground, runSetupAction } from './setup.ts';
-import { writePluginConfig } from './gateway.ts';
-import type { SetupRunDeps } from './setup.ts';
-import { CHECK_INTERVAL_MS, repoSlug } from './update-check.ts';
+import { readConfig, readSeerrConnection } from './settings/config.ts';
+import type { SeerrConfig } from './settings/config.ts';
+import { handleSeerrWebhook } from './notify/handler.ts';
+import { describeSending, resolveSessionForTest, resolveSessionId } from './host/session-resolve.ts';
+import { sendTestMessage } from './panel/test-send.ts';
+import type { GatewayDeps } from './host/gateway.ts';
+import type { HandlerDeps } from './notify/handler.ts';
+import { readDeadLetters } from './notify/deadletter.ts';
+import { probeSeerr } from './seerr/probe.ts';
+import { API_KEY_FILE_CANDIDATES, refreshRoster } from './panel/roster-refresh.ts';
+import { parseSetupAction, readSetup, refreshSetupInBackground, runSetupAction } from './panel/setup.ts';
+import { writePluginConfig } from './host/gateway.ts';
+import type { SetupRunDeps } from './panel/setup.ts';
+import { CHECK_INTERVAL_MS, repoSlug } from './panel/update-check.ts';
 
 // Baked from manifest.json at build time by package.mjs (esbuild `define`). The sandbox does not pass
 // `manifest` into ctx, so this is how the plugin knows its own version at runtime. Falls back to a dev

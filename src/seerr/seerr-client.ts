@@ -5,7 +5,7 @@
 // or unreachable must degrade the notification, never drop it. So each fetch swallows its own failure
 // and the caller carries on with whatever the webhook payload already contained.
 
-import type { PluginNetResponse } from './types/openwa';
+import type { PluginNetResponse } from '../types/openwa';
 import type { MediaDetails, MediaRatings, NormalizedEvent } from './normalize.ts';
 
 /** Below the host's 15 s net.fetch default, so a stalled Seerr cannot eat the whole enrichment budget. */

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { PluginNetResponse } from './types/openwa';
+import type { PluginNetResponse } from '../types/openwa';
 import { fetchSeerrRoster, refreshRoster } from './roster-refresh.ts';
 import type { RefreshDeps } from './roster-refresh.ts';
 

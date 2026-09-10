@@ -7,7 +7,7 @@
 //
 // Nothing here downloads or installs anything. It compares two version strings and produces a link.
 
-import type { NetFetch } from './seerr-client.ts';
+import type { NetFetch } from '../seerr/seerr-client.ts';
 
 /** A release check must never delay a config save for long; GitHub is either quick or not answering. */
 const TIMEOUT_MS = 8000;

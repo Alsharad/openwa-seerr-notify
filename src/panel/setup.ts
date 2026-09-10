@@ -18,11 +18,11 @@
 // only by an admin API key — the same key class that could rotate it again anyway — and the editor
 // offers a Clear button next to it. Copy it into Seerr, then clear it.
 
-import { gatewayRequest, writePluginConfig } from './gateway.ts';
-import type { GatewayDeps } from './gateway.ts';
+import { gatewayRequest, writePluginConfig } from '../host/gateway.ts';
+import type { GatewayDeps } from '../host/gateway.ts';
 import { checkForUpdate, isNewer, pinnedDownloadUrl } from './update-check.ts';
 import type { UpdateState } from './update-check.ts';
-import type { NetFetch } from './seerr-client.ts';
+import type { NetFetch } from '../seerr/seerr-client.ts';
 
 
 /** Everything the plugin writes for the Setup tab. Written whole, so callers merge before writing. */

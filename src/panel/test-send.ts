@@ -15,11 +15,11 @@
 // SAME code a real delivery runs rather than a parallel imitation that could drift: session resolution,
 // recipient routing, message formatting, and the retrying WhatsApp send.
 
-import { processEvent } from './handler.ts';
-import type { HandlerDeps } from './handler.ts';
-import { normalizePayload, validatePayload } from './normalize.ts';
-import { resolveRecipients } from './recipients.ts';
-import { maskChatId } from './config.ts';
+import { processEvent } from '../notify/handler.ts';
+import type { HandlerDeps } from '../notify/handler.ts';
+import { normalizePayload, validatePayload } from '../seerr/normalize.ts';
+import { resolveRecipients } from '../notify/recipients.ts';
+import { maskChatId } from '../settings/config.ts';
 
 /**
  * Byte-for-byte what Seerr's Test button puts on the wire, captured from a live 3.4.1 instance. Keeping

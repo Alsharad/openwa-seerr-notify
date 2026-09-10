@@ -9,6 +9,6 @@
     "allowImportingTsExtensions": true,
     "esModuleInterop": true
   },
-  "include": ["*.ts", "types/**/*.d.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

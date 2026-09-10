@@ -12,7 +12,7 @@
 //                         about the API key.
 //   GET /api/v1/user    — behind `isAuthenticated()`, so a 200 proves the API key is accepted.
 
-import type { PluginNetResponse } from './types/openwa';
+import type { PluginNetResponse } from '../types/openwa';
 import type { NetFetch } from './seerr-client.ts';
 
 /** Comfortably inside the host's 5 s healthCheck budget, leaving room for both calls and the reply. */

@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_CONTENT } from './content.ts';
-import type { ContentFlags } from './content.ts';
+import { DEFAULT_CONTENT } from '../settings/content.ts';
+import type { ContentFlags } from '../settings/content.ts';
 import { formatMessages } from './formatter.ts';
-import { normalizePayload } from './normalize.ts';
-import type { MediaDetails, NormalizedEvent } from './normalize.ts';
+import { normalizePayload } from '../seerr/normalize.ts';
+import type { MediaDetails, NormalizedEvent } from '../seerr/normalize.ts';
 
 const allOn: ContentFlags = DEFAULT_CONTENT;
 const allOff: ContentFlags = Object.fromEntries(

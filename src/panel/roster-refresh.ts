@@ -20,11 +20,11 @@
 //
 // Both live in gateway.ts now, shared with the Setup tab (setup.ts); this file keeps the Seerr half.
 
-import { toRosterEntry } from './roster.ts';
-import type { RosterEntry } from './roster.ts';
-import { writePluginConfig } from './gateway.ts';
-import type { GatewayDeps } from './gateway.ts';
-import type { NetFetch } from './seerr-client.ts';
+import { toRosterEntry } from '../settings/roster.ts';
+import type { RosterEntry } from '../settings/roster.ts';
+import { writePluginConfig } from '../host/gateway.ts';
+import type { GatewayDeps } from '../host/gateway.ts';
+import type { NetFetch } from '../seerr/seerr-client.ts';
 
 /** Where the gateway writes its seeded admin key. Docker path first, then a bare-metal checkout. */
 export const API_KEY_FILE_CANDIDATES = ['/app/data/.api-key', './data/.api-key'];

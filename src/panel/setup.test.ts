@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { PluginNetResponse } from './types/openwa';
+import type { PluginNetResponse } from '../types/openwa';
 import { EMPTY_SETUP, parseSetupAction, readSetup, refreshSetupInBackground, runSetupAction } from './setup.ts';
 import type { SetupRunDeps } from './setup.ts';
 
@@ -181,7 +181,7 @@ test('the pre-1.13 config key names still resolve', async () => {
   // `jellyseerrUrl` / `jellyseerrApiKey` were renamed to `seerrUrl` / `seerrApiKey`. Reading both is what
   // keeps an install working between the version that renames them and the pass that migrates it — a
   // rename that silently disconnects everyone's Seerr server is not a rename, it is an outage.
-  const { readSeerrConnection } = await import('./config.ts');
+  const { readSeerrConnection } = await import('../settings/config.ts');
 
   const old = readSeerrConnection({ jellyseerrUrl: 'http://seerr:5055/', jellyseerrApiKey: 'k' });
   assert.equal(old.url, 'http://seerr:5055');

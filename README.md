@@ -251,10 +251,10 @@ people twice — so the answer is a better test rig, not weaker dedup.
 export SEERR_INGRESS_TOKEN=<instance secret>
 export INGRESS_URL=http://<openwa-host>:<openwa-port>/api/ingress/seerr-notify/seerr-prod/seerr
 
-node send-test.mjs --list                        # every event type
-node send-test.mjs                               # TEST_NOTIFICATION (admins)
-node send-test.mjs MEDIA_AVAILABLE --as alice    # poster + enrichment, to a requester
-node send-test.mjs ISSUE_COMMENT --as alice
+node scripts/send-test.mjs --list                        # every event type
+node scripts/send-test.mjs                               # TEST_NOTIFICATION (admins)
+node scripts/send-test.mjs MEDIA_AVAILABLE --as alice    # poster + enrichment, to a requester
+node scripts/send-test.mjs ISSUE_COMMENT --as alice
 ```
 
 Each run carries a `_nonce`, so it is always a fresh delivery and never deduplicated. `--as` is the
@@ -295,6 +295,34 @@ header for `dedupHeader` to key on. The fix belongs in the host: a per-route opt
 Note that the key includes `instanceId`, so renaming or recreating an ingress instance starts a fresh
 de-duplication window.
 
+### Layout
+
+```
+src/
+  index.ts        the plugin object the host loads: lifecycle, ingress, health
+  settings/       operator config — parsing, defaults, validation
+                    config.ts  content.ts  routing.ts  roster.ts
+  seerr/          talking to Seerr, and reading what it sends
+                    seerr-client.ts  normalize.ts  probe.ts
+  notify/         turning an event into messages and delivering them
+                    handler.ts  formatter.ts  recipients.ts
+                    deliver.ts  deadletter.ts
+  panel/          what the settings panel's buttons trigger
+                    setup.ts  update-check.ts  test-send.ts  roster-refresh.ts
+  host/           the OpenWA gateway itself
+                    gateway.ts  session-resolve.ts
+  types/          host type declarations
+scripts/          build.mjs  zip-store.mjs  refresh-roster.mjs  send-test.mjs
+config/index.html the settings panel, shipped as-is inside the zip
+```
+
+Tests sit beside what they test — `src/notify/formatter.test.ts` covers `src/notify/formatter.ts`.
+
+Dependencies run one way, with no cycles: `index.ts` → `panel/` → `notify/` → `settings/` + `seerr/`.
+`settings/` imports nothing outside itself, `seerr/` reaches only the host type declarations, and
+`host/` sits at the bottom importing nothing at all. `src/layout.test.ts` fails the build if that stops
+being true, so the diagram above cannot quietly go stale.
+
 ### Build from source
 
 ```bash
@@ -332,7 +360,7 @@ are listed because they are what the REST API and any backup will show you.
 | `sendPoster` | no | `true` | Attach the poster to `MEDIA_AVAILABLE` / `MEDIA_PENDING`. Sent as the image caption when the whole message fits WhatsApp's 1024-character caption limit, otherwise as an uncaptioned image followed by the text. Edited in **Message content** as **Poster**; it stays a top-level key rather than a `content` section so an existing setting is never re-read from a different place. |
 | `routing` | no | *(defaults)* | Per-event delivery rules — `{ EVENT: { user, admin, adminInfo } }`. Edited in **Who gets what**; unset events use the shipped defaults. `adminInfo` appends a block to the admin copy carrying the requester or reporter's name and email and the Seerr request/issue id. Someone who is both the requester and an admin gets one message — the admin one. |
 | `content` | no | *(all on)* | Which sections a media notification carries — `{ showOverview, showRating, showRuntime, showReleaseDate, showGenres, showCast, showDirector, showTrailer, showSeasons, showCollection }`. Edited in **Message content**. An unset section is included, so a config written before this key existed keeps the messages it was producing. See *What each content switch controls*. |
-| `seerrRoster` | no | `[]` | Cached Seerr accounts (`{ id, name, email, isAdmin }`) so the editor can list them. Written by the Refresh button or `refresh-roster.mjs`. |
+| `seerrRoster` | no | `[]` | Cached Seerr accounts (`{ id, name, email, isAdmin }`) so the editor can list them. Written by the Refresh button or `scripts/refresh-roster.mjs`. |
 | `rosterSyncedAt` | no | `""` | ISO timestamp of the last roster refresh. |
 | `rosterRefreshRequestedAt` | no | `""` | Token stamped by the Refresh button; changing it is what asks the plugin to refetch. Not edited by hand. |
 | `setup` | no | `{}` | Written by the plugin: the running version, the release check, and a mirror of the Seerr API key so the Connection tab can show it. Not edited by hand. No ingress URL or ingress secret — those live on OpenWA's Instances tab, which shows them live. |
@@ -412,7 +440,7 @@ it. This table is where the detail lives.
   test reaches nobody and is recorded as `no_recipients`, which the health check reports.
 - **The Refresh button needs the gateway's key file.** It reads `/app/data/.api-key` to write the roster
   back through OpenWA's own API — see **Security**. Where that file is unreadable, use
-  `refresh-roster.mjs` instead, which takes the key from the environment.
+  `scripts/refresh-roster.mjs` instead, which takes the key from the environment.
 - **Verified against Seerr 3.4.1.** Notably, that build validates `/api/v1/status` query
   params against its OpenAPI schema, so the plugin sends `checkUpdateAvailable=false` (an empty value or
   `0` is rejected with a 400). Older Seerr builds coerce the value instead and simply run the update
@@ -484,7 +512,7 @@ restart. Nothing is cached across deliveries.
   ingress secret again after an unrelated restart.
 
   If you would rather no plugin on your host could do this, delete `gateway.ts`, `setup.ts`,
-  `roster-refresh.ts` and the `onConfigChange` handler in `index.ts`, and use `refresh-roster.mjs`, which
+  `roster-refresh.ts` and the `onConfigChange` handler in `index.ts`, and use `scripts/refresh-roster.mjs`, which
   takes the key from the environment of whoever runs it. You lose the Setup tab and the update banner;
   everything on the delivery path works unchanged.
 

@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { ConversationSendEnvelope, PluginNetResponse, WebhookRequest } from './types/openwa';
-import { readConfig } from './config.ts';
-import type { SeerrConfig } from './config.ts';
-import { normalizePayload } from './normalize.ts';
+import type { ConversationSendEnvelope, PluginNetResponse, WebhookRequest } from '../types/openwa';
+import { readConfig } from '../settings/config.ts';
+import type { SeerrConfig } from '../settings/config.ts';
+import { normalizePayload } from '../seerr/normalize.ts';
 import { handleSeerrWebhook, processEvent } from './handler.ts';
 import type { HandlerDeps } from './handler.ts';
 import { DEAD_LETTER_KEY } from './deadletter.ts';

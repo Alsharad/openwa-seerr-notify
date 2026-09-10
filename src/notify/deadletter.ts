@@ -10,7 +10,7 @@
 // cover what the host considers delivered — a send that failed in the background, or an event nobody was
 // mapped to receive.
 
-import type { PluginStorage } from './types/openwa';
+import type { PluginStorage } from '../types/openwa';
 
 export const DEAD_LETTER_KEY = 'dead-letters';
 export const MAX_DEAD_LETTERS = 50;

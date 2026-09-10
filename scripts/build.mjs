@@ -16,6 +16,8 @@ import { join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
 import { zipStore } from './zip-store.mjs';
 
+// The package root, not this file's directory: npm runs a script from the package root, and every
+// path below (manifest, CHANGELOG, dist, the packaged config/ directory) is relative to that.
 const ROOT = process.cwd();
 const fail = (message) => {
   console.error(`✗ ${message}`);
@@ -52,7 +54,7 @@ await mkdir(join(ROOT, 'dist'), { recursive: true });
 // Pins CommonJS so Node loads the bundle correctly even though this package is ESM.
 await writeFile(join(ROOT, 'dist', 'package.json'), JSON.stringify({ type: 'commonjs' }));
 await build({
-  entryPoints: [join(ROOT, 'index.ts')],
+  entryPoints: [join(ROOT, 'src', 'index.ts')],
   bundle: true,
   platform: 'node',
   format: 'cjs',

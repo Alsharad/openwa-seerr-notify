@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { PluginNetResponse } from './types/openwa';
+import type { PluginNetResponse } from '../types/openwa';
 import { checkForUpdate, isNewer, pinnedDownloadUrl, repoSlug } from './update-check.ts';
 
 const NOW = () => new Date('2026-08-21T12:00:00.000Z');

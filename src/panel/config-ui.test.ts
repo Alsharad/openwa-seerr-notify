@@ -5,18 +5,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { readConfig } from './config.ts';
-import { CONTENT_SECTIONS, DEFAULT_CONTENT } from './content.ts';
-import { normalizePayload } from './normalize.ts';
-import { resolveRecipients } from './recipients.ts';
-import { formatMessages } from './formatter.ts';
-import { DEFAULT_ROUTING, ROUTED_EVENTS, routingFor, supportsAdminInfo, supportsRequester } from './routing.ts';
+import { repoFile } from '../test-support.ts';
+import { readConfig } from '../settings/config.ts';
+import { CONTENT_SECTIONS, DEFAULT_CONTENT } from '../settings/content.ts';
+import { normalizePayload } from '../seerr/normalize.ts';
+import { resolveRecipients } from '../notify/recipients.ts';
+import { formatMessages } from '../notify/formatter.ts';
+import { DEFAULT_ROUTING, ROUTED_EVENTS, routingFor, supportsAdminInfo, supportsRequester } from '../settings/routing.ts';
 import { parseSetupAction } from './setup.ts';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const html = readFileSync(join(HERE, 'config', 'index.html'), 'utf8');
+const html = readFileSync(repoFile('config', 'index.html'), 'utf8');
 
 const USER_CHAT = '15550000001@c.us';
 const ADMIN_CHAT = '15550000002@c.us';
@@ -150,7 +148,7 @@ test('routing is honoured: flipping a cell changes who is resolved', () => {
 });
 
 test('the editor declares every field the manifest schema does, and no others', () => {
-  const manifest = JSON.parse(readFileSync(join(HERE, 'manifest.json'), 'utf8')) as {
+  const manifest = JSON.parse(readFileSync(repoFile('manifest.json'), 'utf8')) as {
     configSchema: { properties: Record<string, unknown> };
   };
   const declared = Object.keys(manifest.configSchema.properties).sort();
@@ -246,7 +244,7 @@ test('every switch that changes what a recipient sees is on the Message content 
 });
 
 test('configUi points at the file that exists and is packaged by its top-level directory', () => {
-  const manifest = JSON.parse(readFileSync(join(HERE, 'manifest.json'), 'utf8')) as { configUi?: { entry?: string } };
+  const manifest = JSON.parse(readFileSync(repoFile('manifest.json'), 'utf8')) as { configUi?: { entry?: string } };
   assert.equal(manifest.configUi?.entry, 'config/index.html');
   // Self-contained: an opaque-origin srcdoc iframe cannot load subresources.
   assert.doesNotMatch(html, /<script[^>]+\ssrc=/, 'external script would not load in the sandbox');
@@ -300,7 +298,7 @@ test('the manifest can reach an operator-hosted Seerr, not only an https one', (
   // So the allow-list is '*', and the real gate is the host's SSRF guard plus SSRF_ALLOWED_HOSTS,
   // which is the operator's to set. Assert it, because narrowing this back to a host list would
   // silently break every install whose Seerr is not on https.
-  const manifest = JSON.parse(readFileSync(join(HERE, 'manifest.json'), 'utf8')) as {
+  const manifest = JSON.parse(readFileSync(repoFile('manifest.json'), 'utf8')) as {
     net?: { allow?: string[]; allowConfigHosts?: string[] };
   };
   assert.deepEqual(manifest.net?.allow, ['*']);
@@ -338,7 +336,7 @@ test('the editor names the header the manifest actually verifies', () => {
   // exactly what a shared-secret route compares. Naming a custom header instead cost the operator an
   // extra step for nothing. If the manifest ever moves back to a custom header, the editor has to move
   // with it, or the setup instructions send people to the wrong field.
-  const manifest = JSON.parse(readFileSync(join(HERE, 'manifest.json'), 'utf8')) as {
+  const manifest = JSON.parse(readFileSync(repoFile('manifest.json'), 'utf8')) as {
     ingress: Array<{ signature?: { scheme?: string; header?: string } }>;
   };
   const signature = manifest.ingress[0].signature;
@@ -346,7 +344,7 @@ test('the editor names the header the manifest actually verifies', () => {
   assert.equal(signature?.header, 'Authorization');
   assert.match(html, /Authorization Header/, 'the Setup tab must name the field the operator fills in');
 
-  const rig = readFileSync(join(HERE, 'send-test.mjs'), 'utf8');
+  const rig = readFileSync(repoFile('scripts', 'send-test.mjs'), 'utf8');
   assert.match(rig, /Authorization: TOKEN/, 'send-test.mjs would 401 against the declared header');
 });
 
@@ -422,7 +420,7 @@ test('every button that waits on the plugin waits the same way', () => {
 
   // The plugin has to echo the roster token the same way it echoes a Setup token, or the editor waits
   // for a signal that never comes and falls back to "reload the dashboard".
-  const plugin = readFileSync(join(HERE, 'index.ts'), 'utf8');
+  const plugin = readFileSync(repoFile('src', 'index.ts'), 'utf8');
   assert.match(plugin, /lastAction: `roster\$\{'\$'\}\{token\}`|lastAction: `roster\|\$\{token\}`/);
 });
 
@@ -445,7 +443,7 @@ test('the API key is shown from the mirror, and never wiped when it is not', () 
   );
 
   // And the plugin has to keep that mirror current, without the write it makes looping back on itself.
-  const plugin = readFileSync(join(HERE, 'index.ts'), 'utf8');
+  const plugin = readFileSync(repoFile('src', 'index.ts'), 'utf8');
   assert.match(plugin, /if \(previous\.seerrApiKey === stored\) return;/, 'the mirror must stop when it agrees');
 });
 
@@ -482,7 +480,7 @@ test('installing an update is offered only when there is one, and never unpinned
   assert.match(script, /el\('installUpdate'\)\.hidden = !offer;/);
   assert.match(script, /el\('installUpdateOptions'\)\.hidden = !offer;/);
 
-  const check = readFileSync(join(HERE, 'update-check.ts'), 'utf8');
+  const check = readFileSync(new URL('update-check.ts', import.meta.url), 'utf8');
   assert.match(check, /#sha256=\$\{update\.sha256\}/, 'the install URL must carry an integrity pin');
   assert.match(check, /publishes no checksum, so the install cannot be pinned/, 'an unpinned install must be refused');
 });
@@ -542,7 +540,7 @@ test('the Setup tab is a static guide, not a mirror of the Instances tab', () =>
 
 
 test('a cell that cannot apply is never rendered as a toggle, and never as an off toggle', () => {
-  const html = readFileSync(new URL('./config/index.html', import.meta.url), 'utf8');
+  const html = readFileSync(repoFile('config', 'index.html'), 'utf8');
 
   // Both helpers must exist in the editor, and the renderer must route every column through them —
   // TEST_NOTIFICATION's User cell was a live toggle that could not match anyone, because a test payload

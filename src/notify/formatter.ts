@@ -3,9 +3,9 @@
 // Two messages are produced per event. Recipients flagged admin get the second one, which appends an
 // "Admin Info" block with the requester/reporter identity and the Seerr ids needed to act on the event.
 
-import type { ContentFlags } from './content.ts';
-import type { MediaDetails, NormalizedEvent } from './normalize.ts';
-import { supportsAdminInfo } from './routing.ts';
+import type { ContentFlags } from '../settings/content.ts';
+import type { MediaDetails, NormalizedEvent } from '../seerr/normalize.ts';
+import { supportsAdminInfo } from '../settings/routing.ts';
 
 // Which events the Admin Info block is even expressible for is decided by supportsAdminInfo(); whether
 // it is actually appended is the operator's per-event `adminInfo` toggle.

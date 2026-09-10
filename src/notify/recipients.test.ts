@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readConfig } from './config.ts';
-import { normalizePayload } from './normalize.ts';
+import { readConfig } from '../settings/config.ts';
+import { normalizePayload } from '../seerr/normalize.ts';
 import { resolveRecipients } from './recipients.ts';
 
 const config = readConfig({

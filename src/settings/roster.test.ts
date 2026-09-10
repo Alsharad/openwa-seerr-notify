@@ -1,12 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { repoFile } from '../test-support.ts';
 import { SEERR_ADMIN_PERMISSION, identityFor, isSeerrAdmin, readRoster, rosterIndex, toRosterEntry } from './roster.ts';
 import { readConfig } from './config.ts';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
 
 // Real permission values observed on a live Seerr 3.4.1 instance.
 test('admin status comes from the Seerr permission bit', () => {
@@ -112,7 +109,7 @@ test('a pre-roster config still resolves, so an upgrade does not drop recipients
 
 test('the refresh command uses the same admin bit as the plugin', () => {
   // The script is plain .mjs and cannot import the TypeScript constant, so the duplicate is pinned here.
-  const script = readFileSync(join(HERE, 'refresh-roster.mjs'), 'utf8');
+  const script = readFileSync(repoFile('scripts', 'refresh-roster.mjs'), 'utf8');
   const declared = /const SEERR_ADMIN_PERMISSION = (\d+);/.exec(script);
   assert.ok(declared, 'refresh-roster.mjs must declare SEERR_ADMIN_PERMISSION');
   assert.equal(Number(declared[1]), SEERR_ADMIN_PERMISSION);

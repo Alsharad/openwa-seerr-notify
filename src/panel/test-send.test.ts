@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { SEERR_TEST_PAYLOAD, sendTestMessage } from './test-send.ts';
-import type { HandlerDeps } from './handler.ts';
-import { readConfig } from './config.ts';
-import type { ConversationSendEnvelope, PluginNetResponse } from './types/openwa';
+import type { HandlerDeps } from '../notify/handler.ts';
+import { readConfig } from '../settings/config.ts';
+import type { ConversationSendEnvelope, PluginNetResponse } from '../types/openwa';
 
 const base = {
   seerrUrl: 'http://seerr.local:5055',

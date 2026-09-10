@@ -6,9 +6,9 @@
 //   ISSUE_*   → the reporter and every admin
 //   TEST_NOTIFICATION → admins only
 
-import type { SeerrConfig, SeerrUser } from './config.ts';
-import type { NormalizedEvent, SeerrActor } from './normalize.ts';
-import { routingFor } from './routing.ts';
+import type { SeerrConfig, SeerrUser } from '../settings/config.ts';
+import type { NormalizedEvent, SeerrActor } from '../seerr/normalize.ts';
+import { routingFor } from '../settings/routing.ts';
 
 export type RecipientSource = 'requester' | 'reporter' | 'admin';
 

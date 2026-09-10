@@ -28,8 +28,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "node build.mjs",
-    "test": "node --import tsx --test *.test.ts",
+    "build": "node scripts/build.mjs",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test && npm run build"
   },

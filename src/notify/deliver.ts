@@ -5,7 +5,7 @@
 // its own send calls — so exceeding either limit is a new failure mode, and it is handled by planning
 // the sends up front rather than discovering a 400 at delivery time.
 
-import type { ConversationSendEnvelope } from './types/openwa';
+import type { ConversationSendEnvelope } from '../types/openwa';
 
 export const MAX_CAPTION = 1024;
 export const MAX_TEXT = 4096;
