@@ -307,11 +307,16 @@ to build when `manifest.json`, `package.json` and the top released CHANGELOG hea
 version, when `manifest.main` is missing from the archive, or when the result exceeds OpenWA's 5 MB
 install limit.
 
-`.github/workflows/ci.yml` runs the same three commands on every push, and tagging `v<x.y.z>` publishes a
-release with the zip and its checksum attached. There is no CI badge above because this repository's
-Actions are currently disabled for billing reasons — every run fails in seconds without executing
-anything, which would show as a red badge on code that passes. Run `npm run check` locally until that
-clears.
+Releases are built and published by hand: `npm run check`, then `gh release create v<x.y.z>` with the
+zip attached. `npm run check` passing locally is the gate, and there is no CI badge above because there
+is no CI.
+
+`.github/workflows/ci.yml` would have done both on a tag push, and is kept for reference, but it is
+**disabled**. This repository's Actions are billing-locked, so every run failed in seconds without
+executing a single step — a red cross on code that passes, once per push. Re-enabling it needs two
+fixes first: it attaches a `.sha256` sidecar nothing reads (the in-panel updater pins its download to
+`assets[].digest`, which GitHub computes itself), and its release job would overwrite hand-written
+release notes with generated ones.
 
 ## Configuration
 

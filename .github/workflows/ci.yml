@@ -1,3 +1,23 @@
+# DISABLED — releases are built and published by hand.
+#
+# This repository's Actions are billing-locked: every run failed in seconds without executing a step,
+# so the only thing this produced was a red cross per push on code that passes. It is switched off at
+# the repository (`gh workflow disable CI`) rather than deleted, because it is still an accurate record
+# of what the build gate is.
+#
+# Two things to fix before re-enabling it, both of which it currently gets wrong:
+#
+#   • The `release` job attaches a `.sha256` sidecar that nothing reads. The plugin's in-panel updater
+#     pins its download to `assets[].digest` — the hash GitHub computes for the asset itself — and it
+#     could not read a sidecar anyway, since `ctx.net.fetch` refuses the 302 an asset URL answers with.
+#     Releases from v1.18.0 on ship the zip alone.
+#
+#   • A hand-published release already exists by the time its tag lands, because `gh release create`
+#     makes the tag and the release together. `action-gh-release` would then update that release in
+#     place, replacing the written notes with `generate_release_notes` output.
+#
+# Until then: `npm run check` locally, then `gh release create v<x.y.z> seerr-notify.zip`.
+
 name: CI
 
 on:
@@ -29,9 +49,9 @@ jobs:
           name: seerr-notify-zip
           path: seerr-notify.zip
 
-  # Tagging `v<x.y.z>` publishes a Release with the installable .zip and its checksum attached. Both are
-  # load-bearing: the README points at a stable URL rather than a CI artifact, and the plugin's own
-  # in-panel updater pins its download to the sha256 GitHub records for that asset.
+  # Tagging `v<x.y.z>` publishes a Release with the installable .zip attached — load-bearing, because the
+  # README points at a stable release URL rather than at a CI artifact, and the in-panel updater installs
+  # from it. The `.sha256` sidecar below is NOT load-bearing; see the note at the top of this file.
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: check
