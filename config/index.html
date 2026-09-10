@@ -195,9 +195,11 @@
   .switch:first-child { border-top: 0; padding-top: 0; }
   .switch:last-child { padding-bottom: 0; }
   .switch input { flex: 0 0 auto; width: 15px; height: 15px; margin: 2px 0 0; accent-color: var(--accent); }
-  .switch .txt { min-width: 0; }
-  .switch .txt b { display: block; font-size: 12px; font-weight: 600; }
-  .switch .txt small { display: block; color: var(--ink-dim); font-size: 11px; margin-top: 2px; }
+  /* Label and description share a row, and wrap to a second only when the modal is too narrow to
+     hold them — a ten-row card of two-line switches was more scrolling than the content justified. */
+  .switch .txt { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+  .switch .txt b { font-size: 12px; font-weight: 600; }
+  .switch .txt small { color: var(--ink-dim); font-size: 11px; }
 
   /* ── Recipients ───────────────────────────────────────────────────────── */
   .people th.tick, .people td.tick { width: 26px; padding-right: 0; }

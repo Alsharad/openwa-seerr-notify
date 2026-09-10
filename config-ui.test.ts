@@ -382,6 +382,28 @@ test('the editor keeps the interface rules that silently regress', () => {
   assert.deepEqual(problems, []);
 });
 
+test('a switch description sits on the label row, not under it', () => {
+  // Both were display:block, which stacked every switch into two lines and made a ten-row card scroll
+  // for no reason. Asserted on the component rather than on one tab: the Options switches read the
+  // same rule, and a fix applied to one card and not the other is the drift this repo keeps producing.
+  const css = html.split('</style>')[0];
+  const rule = (selector: string) => {
+    const at = css.indexOf(`${selector} {`);
+    assert.notEqual(at, -1, `no rule for ${selector}`);
+    const open = css.indexOf('{', at);
+    return css.slice(open + 1, css.indexOf('}', open));
+  };
+
+  const txt = rule('.switch .txt');
+  assert.match(txt, /display:\s*flex/, 'the label and its description must share a flex row');
+  // Without this the description is pushed off the edge instead of wrapping in a narrow modal.
+  assert.match(txt, /flex-wrap:\s*wrap/, 'a description too long for the row must wrap, not overflow');
+
+  for (const child of ['.switch .txt b', '.switch .txt small']) {
+    assert.doesNotMatch(rule(child), /display:\s*block/, `${child} back to display:block stacks the row`);
+  }
+});
+
 test('the icon sheet has no unused symbols and no missing ones', () => {
   // The icons are inlined because the frame's CSP forbids external images. A `<use href="#…">` that
   // resolves to nothing renders as empty space, which is exactly how a missing icon looks in a screenshot.

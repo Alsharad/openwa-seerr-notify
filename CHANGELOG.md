@@ -7,6 +7,18 @@ All notable changes to this plugin are documented here. The format follows
 ## [Unreleased]
 
 
+## [1.22.1] - 2026-09-10
+
+### Changed
+
+- **A switch's description now sits on its label's row** rather than on a second line beneath it. Ten
+  two-line rows made the Message content card scroll for no reason. The description wraps underneath
+  only when the modal is genuinely too narrow to hold it.
+
+  Changed on the `.switch` component, so the Options tab reads the same way — fixing this on the card
+  that prompted it and leaving the other looking different is the drift this panel keeps accumulating.
+
+
 ## [1.22.0] - 2026-09-10
 
 ### Changed
