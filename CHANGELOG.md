@@ -8,12 +8,17 @@ All notable changes to this plugin are documented here. The format follows
 
 ### Documentation
 
+- **New `CONTRIBUTING.md`**, carrying what a contributor needs and the README no longer does: build and
+  test commands, the source layout and its one-way dependency rule, the conventions this panel is held
+  to, how a release is cut, the OpenWA host constraints that each cost real debugging time, why delivery
+  is backgrounded, and the `scripts/` test rigs. `src/layout.test.ts` asserts the layout diagram in it
+  still matches the directories on disk, so it cannot go stale unnoticed.
+
 - **The README is strictly operator-facing now.** Everything that only matters while editing the source
-  — the directory layout, the build and release commands, the host constraints that cost real debugging
-  time, why delivery is backgrounded, the `scripts/` test rigs — moved into an untracked `CLAUDE.md`.
-  What stayed is what someone running the plugin needs: setup, install, upgrade, configuration,
-  compatibility and the full security disclosure, including the source pointers for opting out of the
-  privileged bits.
+  — the directory layout, the build and release commands, the host constraints, why delivery is
+  backgrounded, the `scripts/` test rigs — moved to `CONTRIBUTING.md`. What stayed is what someone
+  running the plugin needs: setup, install, upgrade, configuration, compatibility and the full security
+  disclosure, including the source pointers for opting out of the privileged bits.
 
 - Two claims in it had gone stale and are corrected. It still said every **Now Available** section was
   always on and could not be switched off, which v1.21.0 made false. It also said every release ships a

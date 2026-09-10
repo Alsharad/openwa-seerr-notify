@@ -447,6 +447,11 @@ restart. Nothing is cached across deliveries.
   whoever runs it. You lose the Setup tab and the update banner;
   everything on the delivery path works unchanged.
 
+## Contributing
+
+Build steps, the source layout and the conventions this codebase holds to are in
+[CONTRIBUTING.md](./CONTRIBUTING.md).
+
 ## Changelog
 
 See [CHANGELOG.md](./CHANGELOG.md).

@@ -8,7 +8,8 @@ dist/
 
 # Local tooling and editor droppings.
 .claude/
-# Notes for whoever edits this code — kept out of the published repo deliberately.
+# Notes about the one gateway this is developed against. CONTRIBUTING.md is the tracked
+# guide; this is the local half, deliberately unpublished.
 CLAUDE.md
 .env
 .env.*
