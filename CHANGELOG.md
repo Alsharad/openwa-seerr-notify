@@ -14,6 +14,16 @@ All notable changes to this plugin are documented here. The format follows
   is backgrounded, and the `scripts/` test rigs. `src/layout.test.ts` asserts the layout diagram in it
   still matches the directories on disk, so it cannot go stale unnoticed.
 
+- **The README is half the length and scannable.** It had grown to 455 lines of prose that nobody was
+  going to read end to end. It now opens with a sample message, then Install, Setup as five numbered
+  steps, a table of what each tab does, and a symptom → cause → fix troubleshooting table. The long
+  explanations behind those — the SSRF setting, session binding, ingress de-duplication — are still
+  there, folded into `<details>` so they are one click away rather than in the way. Roughly 150 lines
+  are visible on load.
+
+- **New `SECURITY.md`** holding the security disclosure and the `setup.seerrApiKey` mirror rationale,
+  which were 75 lines of the old README between them.
+
 - **The README is strictly operator-facing now.** Everything that only matters while editing the source
   — the directory layout, the build and release commands, the host constraints, why delivery is
   backgrounded, the `scripts/` test rigs — moved to `CONTRIBUTING.md`. What stayed is what someone

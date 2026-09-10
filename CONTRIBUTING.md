@@ -128,6 +128,16 @@ fix would be unzipping the package to edit the manifest. The real gate is the ho
 **An `onEnable` that throws marks the plugin ERROR, and the host does not deliver config changes to a
 plugin in ERROR** — which strands any panel button that works by saving a config change.
 
+## Odds and ends
+
+- **The end-to-end delivery path is covered by unit tests against a stubbed capability surface**, not by
+  anything that talks to a live WhatsApp session. Worth knowing before trusting a green run.
+- **Seerr 3.4.1 validates `/api/v1/status` query params against its OpenAPI schema**, so the plugin sends
+  `checkUpdateAvailable=false` — an empty value or `0` is rejected with a 400. Older builds coerce it and
+  simply run the update check, which is slower but not an error.
+- **With `QUEUE_ENABLED=false`** (OpenWA's default) ingress dispatches inline with a single attempt. It
+  does not matter much here, since the plugin owns its own retries — see below.
+
 ## Why delivery is backgrounded
 
 The host dispatches an ingress handler with a **5 second** budget and does **not** cancel the work when
