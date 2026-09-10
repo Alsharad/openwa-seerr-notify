@@ -1,7 +1,7 @@
 {
   "id": "seerr-notify",
   "name": "Seerr Notifications",
-  "version": "1.20.0",
+  "version": "1.21.0",
   "type": "extension",
   "main": "dist/index.js",
   "description": "Deliver Seerr request and issue notifications over WhatsApp, formatted per recipient.",
@@ -191,6 +191,11 @@
         "type": "object",
         "title": "Per-event routing",
         "description": "Who receives each Seerr event, and whether admins get the Admin Info block. Managed from the Who gets what tab; unset events fall back to the plugin defaults."
+      },
+      "content": {
+        "type": "object",
+        "title": "Message content",
+        "description": "Which sections a media notification carries — plot summary, rating, runtime, cast, trailer and the rest. Managed from the Message content tab; an unset section is included."
       }
     }
   }

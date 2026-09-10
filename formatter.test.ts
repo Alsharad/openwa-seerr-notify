@@ -1,24 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { MediaAvailableFlags } from './config.ts';
+import { DEFAULT_CONTENT } from './content.ts';
+import type { ContentFlags } from './content.ts';
 import { formatMessages } from './formatter.ts';
 import { normalizePayload } from './normalize.ts';
 import type { MediaDetails, NormalizedEvent } from './normalize.ts';
 
-const allOn: MediaAvailableFlags = {
-  showReleaseDate: true,
-  showRatings: true,
-  showOverview: true,
-  showGenres: true,
-  showDirector: true,
-  showCast: true,
-  showTrailer: true,
-  showSeasons: true,
-  showCollection: true,
-};
-const allOff: MediaAvailableFlags = Object.fromEntries(
+const allOn: ContentFlags = DEFAULT_CONTENT;
+const allOff: ContentFlags = Object.fromEntries(
   Object.keys(allOn).map((k) => [k, false]),
-) as unknown as MediaAvailableFlags;
+) as unknown as ContentFlags;
 
 const movieDetails: MediaDetails = {
   title: 'The Polar Express',
@@ -35,6 +26,40 @@ const movieDetails: MediaDetails = {
 const available = (extra: Partial<NormalizedEvent> = {}): NormalizedEvent => ({
   ...normalizePayload({ notification_type: 'MEDIA_AVAILABLE', subject: 'The Polar Express', media: { media_type: 'movie' } }),
   ...extra,
+});
+
+test('rating and runtime are separate switches sharing one line', () => {
+  const event = available({ mediaDetails: movieDetails });
+  const both = formatMessages(event, allOn).userMessage;
+  assert.match(both, /⭐ 7\.1\/10 {2}\| {2}⏱ 100 min/);
+
+  const ratingOnly = formatMessages(event, { ...allOn, showRuntime: false }).userMessage;
+  assert.match(ratingOnly, /⭐ 7\.1\/10/);
+  assert.doesNotMatch(ratingOnly, /100 min/);
+
+  const runtimeOnly = formatMessages(event, { ...allOn, showRating: false }).userMessage;
+  assert.match(runtimeOnly, /⏱ 100 min/);
+  assert.doesNotMatch(runtimeOnly, /⭐/);
+
+  // Neither on leaves no orphaned separator behind.
+  const neither = formatMessages(event, { ...allOn, showRating: false, showRuntime: false }).userMessage;
+  assert.doesNotMatch(neither, /\|/);
+});
+
+test('MEDIA_PENDING honours the same plot and genre switches Now Available does', () => {
+  const pending = {
+    ...normalizePayload({ notification_type: 'MEDIA_PENDING', subject: 'A Film', media: { media_type: 'movie' } }),
+    mediaDetails: movieDetails,
+  };
+  const on = formatMessages(pending, allOn).userMessage;
+  assert.match(on, /A boy boards a train/);
+  assert.match(on, /🎭 Animation/);
+
+  const off = formatMessages(pending, { ...allOn, showOverview: false, showGenres: false }).userMessage;
+  assert.doesNotMatch(off, /A boy boards a train/);
+  assert.doesNotMatch(off, /🎭/);
+  // The headline survives either way.
+  assert.match(off, /⏳ Request Submitted/);
 });
 
 test('MEDIA_AVAILABLE renders every enabled section', () => {

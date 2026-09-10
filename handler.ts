@@ -93,7 +93,7 @@ export async function processEvent(deps: HandlerDeps, event: NormalizedEvent, re
 
   const { userMessage, adminMessage } = formatMessages(
     event,
-    cfg.flags,
+    cfg.content,
     routingFor(cfg.routing, event.notificationType).adminInfo,
   );
   const posterUrl = POSTER_TYPES.has(event.notificationType) && event.posterUrl ? event.posterUrl : null;

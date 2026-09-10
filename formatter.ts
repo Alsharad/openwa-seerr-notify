@@ -3,7 +3,7 @@
 // Two messages are produced per event. Recipients flagged admin get the second one, which appends an
 // "Admin Info" block with the requester/reporter identity and the Seerr ids needed to act on the event.
 
-import type { MediaAvailableFlags } from './config.ts';
+import type { ContentFlags } from './content.ts';
 import type { MediaDetails, NormalizedEvent } from './normalize.ts';
 import { supportsAdminInfo } from './routing.ts';
 
@@ -64,7 +64,7 @@ function buildIssueAdminLines(issueId: string | null, issueType: string | null):
   return lines;
 }
 
-function formatMediaAvailable(event: NormalizedEvent, f: MediaAvailableFlags): string {
+function formatMediaAvailable(event: NormalizedEvent, f: ContentFlags): string {
   const details = event.mediaDetails;
   const movie = event.mediaType === 'movie';
 
@@ -80,7 +80,9 @@ function formatMediaAvailable(event: NormalizedEvent, f: MediaAvailableFlags): s
 
   if (f.showReleaseDate && rawDate) lines.push(`📅 ${rawDate}`);
 
-  if (f.showRatings) {
+  // Rating and runtime share one line when both are on, so they are collected before either is emitted.
+  const metaParts: string[] = [];
+  if (f.showRating) {
     const ratings = event.mediaRatings;
     let bestRating: string | null = null;
     if (ratings) {
@@ -89,12 +91,13 @@ function formatMediaAvailable(event: NormalizedEvent, f: MediaAvailableFlags): s
       else if (ratings.criticsScore != null) bestRating = `${ratings.criticsScore}%`;
     }
     if (!bestRating && (details.voteAverage ?? 0) > 0) bestRating = `${details.voteAverage}/10`;
-    const runtime = details.runtime || (Array.isArray(details.episodeRunTime) ? details.episodeRunTime[0] : null);
-    const metaParts: string[] = [];
     if (bestRating) metaParts.push(`⭐ ${bestRating}`);
-    if (runtime) metaParts.push(`⏱ ${runtime} min`);
-    if (metaParts.length) lines.push(metaParts.join('  |  '));
   }
+  if (f.showRuntime) {
+    const runtime = details.runtime || (Array.isArray(details.episodeRunTime) ? details.episodeRunTime[0] : null);
+    if (runtime) metaParts.push(`⏱ ${runtime} min`);
+  }
+  if (metaParts.length) lines.push(metaParts.join('  |  '));
 
   if (f.showOverview && details.overview) {
     lines.push('', `_${details.overview}_`);
@@ -161,7 +164,7 @@ function addIssueDetails(msg: string, event: NormalizedEvent): string {
   return out;
 }
 
-export function formatUserMessage(event: NormalizedEvent, f: MediaAvailableFlags): string {
+export function formatUserMessage(event: NormalizedEvent, f: ContentFlags): string {
   const { subject, eventName: name } = event;
   const emoji = getMediaEmoji(event.mediaType);
   const movie = event.mediaType === 'movie';
@@ -171,9 +174,13 @@ export function formatUserMessage(event: NormalizedEvent, f: MediaAvailableFlags
       const details = event.mediaDetails;
       const lines = [`⏳ Request Submitted\n\n${emoji} ${subject}`];
       if (!movie && event.requestedSeasons) lines.push(`${emoji} Seasons: ${event.requestedSeasons}`);
-      if (details?.overview) lines.push('', `_${details.overview}_`);
-      const genres = getGenreNames(details);
-      if (genres.length) lines.push('', `🎭 ${genres.join(', ')}`);
+      // The same two switches the Now Available message reads. A Plot summary toggle that only half
+      // applies is indistinguishable, from the operator's side, from one that does not work.
+      if (f.showOverview && details?.overview) lines.push('', `_${details.overview}_`);
+      if (f.showGenres) {
+        const genres = getGenreNames(details);
+        if (genres.length) lines.push('', `🎭 ${genres.join(', ')}`);
+      }
       return lines.join('\n');
     }
 
@@ -310,7 +317,7 @@ export interface FormattedMessages {
  */
 export function formatMessages(
   event: NormalizedEvent,
-  f: MediaAvailableFlags,
+  f: ContentFlags,
   withAdminInfo = true,
 ): FormattedMessages {
   const userMessage = formatUserMessage(event, f).trimEnd();

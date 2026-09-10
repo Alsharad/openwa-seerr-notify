@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ALL_SECTIONS, readConfig } from './config.ts';
+import { readConfig } from './config.ts';
+import { CONTENT_SECTIONS, DEFAULT_CONTENT } from './content.ts';
 import { normalizePayload } from './normalize.ts';
 import { resolveRecipients } from './recipients.ts';
 import { formatMessages } from './formatter.ts';
@@ -51,6 +52,44 @@ function eventFor(type: string) {
   return normalizePayload(base);
 }
 
+/** A Now Available event carrying something for every section a movie can render. */
+function fullMovie() {
+  return {
+    ...normalizePayload({ notification_type: 'MEDIA_AVAILABLE', subject: 'A Film', media: { media_type: 'movie' } }),
+    mediaDetails: {
+      title: 'A Film',
+      releaseDate: '2004-11-10',
+      overview: 'A boy boards a train.',
+      voteAverage: 7.1,
+      runtime: 100,
+      genres: [{ name: 'Animation' }],
+      credits: { crew: [{ name: 'A Director', job: 'Director' }], cast: [{ name: 'An Actor', character: 'Someone' }] },
+      relatedVideos: [{ type: 'Trailer', site: 'YouTube', url: 'https://youtu.be/abc' }],
+      collection: { name: 'A Collection' },
+    },
+  };
+}
+
+/** The same, for the two sections only a series has. */
+function fullSeries() {
+  return {
+    ...normalizePayload({ notification_type: 'MEDIA_AVAILABLE', subject: 'A Show', media: { media_type: 'tv' } }),
+    mediaDetails: {
+      name: 'A Show',
+      firstAirDate: '2019-01-01',
+      overview: 'People do things.',
+      voteAverage: 8.2,
+      episodeRunTime: [45],
+      genres: [{ name: 'Drama' }],
+      createdBy: [{ name: 'A Creator' }],
+      credits: { cast: [{ name: 'An Actor', character: 'Someone' }] },
+      relatedVideos: [{ type: 'Trailer', site: 'YouTube', url: 'https://youtu.be/xyz' }],
+      seasons: [{ seasonNumber: 1 }],
+      mediaInfo: { seasons: [{ seasonNumber: 1, status: 5 }] },
+    },
+  };
+}
+
 test('the editor seeds exactly the defaults the plugin applies', () => {
   const editor = parseEditorDefaults();
   assert.deepEqual(Object.keys(editor).sort(), [...ROUTED_EVENTS].sort(), 'event list differs');
@@ -69,7 +108,7 @@ test('the default routing produces the behaviour it always had', () => {
 
     const actualUser = chatIds.includes(USER_CHAT);
     const actualAdmin = chatIds.includes(ADMIN_CHAT);
-    const { userMessage, adminMessage } = formatMessages(normalized, ALL_SECTIONS, expected.adminInfo);
+    const { userMessage, adminMessage } = formatMessages(normalized, DEFAULT_CONTENT, expected.adminInfo);
     const actualAdminInfo = adminMessage !== userMessage;
 
     if (actualUser !== expected.user) drift.push(`${event}: user default ${expected.user}, code ${actualUser}`);
@@ -88,7 +127,7 @@ test('every event the operator can toggle Admin Info on actually produces one', 
   for (const event of ROUTED_EVENTS) {
     if (!supportsAdminInfo(event)) continue;
     const normalized = eventFor(event);
-    const { userMessage, adminMessage } = formatMessages(normalized, ALL_SECTIONS, true);
+    const { userMessage, adminMessage } = formatMessages(normalized, DEFAULT_CONTENT, true);
     assert.notEqual(adminMessage, userMessage, `${event} offers an Admin Info toggle but renders no block`);
     assert.match(adminMessage, /━━━ Admin Info ━━━/, `${event} admin copy is missing the block heading`);
   }
@@ -134,6 +173,8 @@ test('the editor declares every field the manifest schema does, and no others', 
     // Re-stamped only by the Refresh button — the signal the plugin acts on.
     'rosterRefreshRequestedAt',
     'routing',
+    // Which sections a media notification carries — the Message content tab.
+    'content',
     // Owned by the plugin, round-tripped here: ingress URLs, the generated secret, the release check.
     'setup',
     // Stamped by a Setup tab button, cleared by the plugin once the action has run.
@@ -141,6 +182,67 @@ test('the editor declares every field the manifest schema does, and no others', 
   ].sort();
 
   assert.deepEqual(edited, declared);
+});
+
+test('the editor offers exactly the sections the formatter reads', () => {
+  // Same drift risk as DEFAULT_ROUTING: the list is written twice, in two languages, and neither
+  // compiler sees the other. A switch the formatter does not read is dead; a section the editor omits
+  // is unreachable while configUi is present.
+  const block = /var CONTENT_SECTIONS = \[([\s\S]*?)\n  \];/.exec(html);
+  assert.ok(block, 'could not find CONTENT_SECTIONS in the editor');
+
+  const keys = [...block[1].matchAll(/key:\s*'([^']+)'/g)].map((m) => m[1]);
+  assert.deepEqual(keys, [...CONTENT_SECTIONS], 'the editor lists different sections, or a different order');
+
+  // Every switch is labelled, and no label restates the tab it sits on.
+  const labels = [...block[1].matchAll(/label:\s*'([^']+)'/g)].map((m) => m[1]);
+  assert.equal(labels.length, keys.length, 'a section is missing its label');
+});
+
+test('every content switch actually changes a message', () => {
+  // A toggle that renders the same text either way is the defect the Admin info column already avoids.
+  // Each section is checked against the media type that can carry it — seasons need a series, a
+  // collection needs a movie — so "no difference" means the flag is genuinely unread.
+  const cases = [
+    { event: fullMovie(), label: 'movie' },
+    { event: fullSeries(), label: 'series' },
+  ];
+
+  for (const section of CONTENT_SECTIONS) {
+    const off = { ...DEFAULT_CONTENT, [section]: false };
+    const changed = cases.filter((c) => {
+      const on = formatMessages(c.event, DEFAULT_CONTENT).userMessage;
+      return formatMessages(c.event, off).userMessage !== on;
+    });
+    assert.notEqual(changed.length, 0, `switching ${section} off changes nothing in any message`);
+  }
+});
+
+test('every switch that changes what a recipient sees is on the Message content tab', () => {
+  // The poster was left on Options when the content tab was added: the one part of a notification whose
+  // switch lived somewhere else. Splitting "what is in the message" across two tabs is the drift this
+  // catches — sendPoster is a top-level config key rather than a CONTENT_SECTIONS row, so nothing else
+  // here would notice it moving back.
+  const panel = (id: string) => {
+    const start = html.indexOf(`<section id="panel-${id}"`);
+    assert.notEqual(start, -1, `no panel-${id}`);
+    return html.slice(start, html.indexOf('</section>', start));
+  };
+
+  const content = panel('content');
+  const options = panel('options');
+
+  assert.match(content, /id="sendPoster"/, 'the poster switch belongs with the rest of the message');
+  assert.doesNotMatch(options, /id="sendPoster"/, 'the poster switch is back on Options');
+
+  // Options keeps only what does not change a recipient's message.
+  const optionSwitches = [...options.matchAll(/<input type="checkbox" id="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(optionSwitches, ['requireMappedUser', 'debug', 'updateCheckEnabled']);
+
+  // And Reset to defaults covers every switch in the card it sits in, not just the generated rows.
+  const reset = /function resetContent\(\) \{([\s\S]*?)\n  \}/.exec(html);
+  assert.ok(reset, 'could not find resetContent');
+  assert.match(reset[1], /el\('sendPoster'\)\.checked = true/, 'Reset skips the poster switch');
 });
 
 test('configUi points at the file that exists and is packaged by its top-level directory', () => {
@@ -226,7 +328,7 @@ test('the Setup tab is the last tab, and not the one the editor opens on', () =>
   const tabs = [...html.matchAll(/<button role="tab" id="tab-([a-z]+)"[^>]*aria-selected="(true|false)"/g)];
   assert.deepEqual(
     tabs.map((t) => t[1]),
-    ['connection', 'recipients', 'routing', 'options', 'setup'],
+    ['connection', 'recipients', 'routing', 'content', 'options', 'setup'],
   );
   assert.deepEqual(tabs.filter((t) => t[2] === 'true').map((t) => t[1]), ['connection']);
 });

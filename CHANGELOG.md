@@ -6,6 +6,46 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+
+## [1.21.0] - 2026-09-10
+
+### Added
+
+- **A "Message content" tab**, switching each section of a media notification on or off: plot summary,
+  rating, runtime, release date, genres, cast, director, trailer link, season list and collection. Every
+  one is on by default, and an install upgraded from an earlier version keeps every section it had —
+  a config with no `content` key at all reads as everything-on, in the plugin and in the editor alike.
+
+  These switches existed once, as `MediaAvailableFlags`, and were removed in favour of a hardcoded
+  all-on: nine toggles for one message type looked like more configuration surface than the decision
+  deserved. The formatter's per-section branches were kept, so bringing them back was a matter of
+  reconnecting them to config rather than rewriting the formatter.
+
+### Changed
+
+- **Rating and runtime are two switches, not one.** They were a single `showRatings` flag that emitted
+  both halves of the `⭐ 7.1/10  |  ⏱ 100 min` line. They are two facts, and an operator who wants a
+  score does not necessarily want a duration. They still share a line when both are on, and the
+  separator is not left orphaned when only one is.
+
+- **"Send the poster" moved from Options to Message content**, as **Poster**. It governs the poster on
+  exactly the two messages that tab governs, and leaving it on Options split "what is in the message"
+  across two tabs. The config key is still top-level `sendPoster` — not folded into `content` — so an
+  existing setting is never re-read from a different place; only the control moved. **Reset to
+  defaults** covers it along with everything else in the card.
+
+- **Plot summary and Genres now govern Request Submitted as well as Now Available.** That message
+  rendered both unconditionally, so those two switches would have half-applied — which, from the
+  operator's side, is indistinguishable from a switch that does not work.
+
+- The section flags moved out of `config.ts` into their own `content.ts`, next to `routing.ts`: the same
+  shape of decision (a table of cells the editor renders and the plugin merges over defaults) is now the
+  same shape of code, `readContent` mirroring `readRouting`.
+
+### Fixed
+
+- A stray `</div>` between the two cards on the Options tab, which closed nothing.
+
 ### Documentation
 
 - New README section, **When a notification can be silently dropped**, mapping exactly which events can

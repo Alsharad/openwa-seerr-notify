@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ALL_SECTIONS, maskChatId, phoneToChatId, readConfig } from './config.ts';
+import { maskChatId, phoneToChatId, readConfig } from './config.ts';
+import { CONTENT_SECTIONS, DEFAULT_CONTENT } from './content.ts';
 
 const withUser = (extra: Record<string, unknown> = {}) => ({
   users: [{ number: '+62 812-3456-7890', seerrUserId: 1, isAdmin: true }],
@@ -29,15 +30,26 @@ test('readConfig drops mapping rows whose number holds no digits', () => {
   assert.equal(cfg.users[0].chatId, '15551234567@c.us');
 });
 
-test('every Now Available section is on, and no config can switch one off', () => {
+test('every section is on until the operator switches one off', () => {
   const cfg = readConfig(withUser());
-  assert.deepEqual(cfg.flags, ALL_SECTIONS);
-  assert.ok(Object.values(cfg.flags).every((on) => on === true));
+  assert.deepEqual(cfg.content, DEFAULT_CONTENT);
+  assert.ok(Object.values(cfg.content).every((on) => on === true));
 
-  // The nine show* keys were removed from the schema; a stale value left in a stored config from an
-  // older version must not resurrect a disabled section.
-  const stale = readConfig(withUser({ showCast: false, showOverview: false, showSeasons: false }));
-  assert.deepEqual(stale.flags, ALL_SECTIONS);
+  // A config written before the Message content tab existed carries no `content` key at all, and was
+  // running with everything on. Upgrading must not thin anyone's messages out.
+  const legacy = readConfig(withUser({ showCast: false, showOverview: false }));
+  assert.deepEqual(legacy.content, DEFAULT_CONTENT);
+
+  const trimmed = readConfig(withUser({ content: { showCast: false, showTrailer: false } }));
+  assert.equal(trimmed.content.showCast, false);
+  assert.equal(trimmed.content.showTrailer, false);
+  // Sections the patch does not name keep the default rather than falling to false.
+  assert.equal(trimmed.content.showOverview, true);
+
+  // Junk in the stored object is ignored, not coerced: only a real boolean moves a switch.
+  const junk = readConfig(withUser({ content: { showCast: 'no', nonsense: true } }));
+  assert.deepEqual(junk.content, DEFAULT_CONTENT);
+  assert.deepEqual(Object.keys(junk.content).sort(), [...CONTENT_SECTIONS].sort());
 
   assert.equal(cfg.sendPoster, true);
   assert.equal(cfg.requireMappedUser, true);

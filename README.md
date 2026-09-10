@@ -40,6 +40,8 @@ project's [plugin standard](https://github.com/rmyndharis/OpenWA-plugins/blob/ma
   Seerr request/issue ids needed to act on it.
 - **Rich Now Available messages** — overview, rating, runtime, genres, director or creator, top five
   cast, trailer link, per-season availability, and collection membership.
+- **Message content you choose** — every one of those sections, and the poster, is a switch on the
+  **Message content** tab. All on by default; turn off the ones your recipients do not read.
 - **Poster attached** — sent as the image caption when the message fits WhatsApp's 1024-character
   caption limit, otherwise as an uncaptioned image followed by the text.
 - **Host-side authentication** — `signature.scheme: "shared-secret"`; the host compares the
@@ -322,8 +324,9 @@ are listed because they are what the REST API and any backup will show you.
 | `seerrUrl` | **yes** | `""` | Seerr base URL. See *Reaching a self-hosted Seerr*. |
 | `seerrApiKey` | **yes** | `""` | Seerr API key. Reads the user list, and fills notifications out. Redacted to `***` on every read, so the panel shows an empty field with “A key is saved” rather than the sentinel; leaving it empty keeps the stored key. |
 | `requireMappedUser` | no | `true` | On: an event whose requester or reporter matches no enabled recipient is written to the plugin's dead-letter buffer, and the health check reports the count and the most recent reason. Off: dropped without a trace. Shown in the panel as **Flag notifications with no recipient**. |
-| `sendPoster` | no | `true` | Attach the poster to `MEDIA_AVAILABLE` / `MEDIA_PENDING`. Sent as the image caption when the whole message fits WhatsApp's 1024-character caption limit, otherwise as an uncaptioned image followed by the text. |
+| `sendPoster` | no | `true` | Attach the poster to `MEDIA_AVAILABLE` / `MEDIA_PENDING`. Sent as the image caption when the whole message fits WhatsApp's 1024-character caption limit, otherwise as an uncaptioned image followed by the text. Edited in **Message content** as **Poster**; it stays a top-level key rather than a `content` section so an existing setting is never re-read from a different place. |
 | `routing` | no | *(defaults)* | Per-event delivery rules — `{ EVENT: { user, admin, adminInfo } }`. Edited in **Who gets what**; unset events use the shipped defaults. `adminInfo` appends a block to the admin copy carrying the requester or reporter's name and email and the Seerr request/issue id. Someone who is both the requester and an admin gets one message — the admin one. |
+| `content` | no | *(all on)* | Which sections a media notification carries — `{ showOverview, showRating, showRuntime, showReleaseDate, showGenres, showCast, showDirector, showTrailer, showSeasons, showCollection }`. Edited in **Message content**. An unset section is included, so a config written before this key existed keeps the messages it was producing. See *What each content switch controls*. |
 | `seerrRoster` | no | `[]` | Cached Seerr accounts (`{ id, name, email, isAdmin }`) so the editor can list them. Written by the Refresh button or `refresh-roster.mjs`. |
 | `rosterSyncedAt` | no | `""` | ISO timestamp of the last roster refresh. |
 | `rosterRefreshRequestedAt` | no | `""` | Token stamped by the Refresh button; changing it is what asks the plugin to refetch. Not edited by hand. |
@@ -331,6 +334,35 @@ are listed because they are what the REST API and any backup will show you.
 | `setupRequestedAt` | no | `""` | Token stamped by **Check for updates** or **Install it** as `<action>\|<arg>\|<timestamp>`, and cleared by the plugin once the action has run. Not edited by hand. |
 | `updateCheckEnabled` | no | `true` | Ask `api.github.com` for the latest release once a day, and show a banner when it is newer than the running build. Nothing is ever downloaded or installed. Off = no outbound request is made at all. The check also runs on demand from **Options → Check now**. |
 | `debug` | no | `false` | One gateway log line per delivery: event type, resolved recipient count, chat ids masked to their last four digits, and each send's outcome. Message bodies are never logged at any level. Shown in the panel as **Verbose logging**. |
+
+### What each content switch controls
+
+Every switch is on by default. A section is left out when Seerr has nothing for it regardless of the
+switch — a film with no trailer never gets a trailer line — so switching one off is the difference
+between "not available" and "not wanted".
+
+| Switch | In the message | Notes |
+| ------ | -------------- | ----- |
+| `sendPoster` | The poster image | Shown as **Poster**. A top-level key, not a `content` section |
+| `showOverview` | The plot summary, in italics | Also governs **Request Submitted** |
+| `showRating` | `⭐ 7.1/10` | IMDb critics score, else Rotten Tomatoes, else TMDB's vote average |
+| `showRuntime` | `⏱ 100 min` | A series uses the first entry of `episodeRunTime` |
+| `showReleaseDate` | `📅 2004-11-10` | Release date, or first air date for a series |
+| `showGenres` | `🎭 Animation, Family` | Also governs **Request Submitted** |
+| `showCast` | A **Cast** block | The top five billed, with their character names |
+| `showDirector` | `🎬 Robert Zemeckis` | For a series, the creator instead (`✍️`) |
+| `showTrailer` | `🎥 https://youtu.be/…` | The first YouTube trailer Seerr lists |
+| `showSeasons` | A **Seasons** block | Series only. Per-season availability; the specials bucket is never listed |
+| `showCollection` | `🎬 Part of: …` | Movies only |
+
+`showRating` and `showRuntime` share one line when both are on. Everything else is its own line or block.
+**Reset to defaults** on that tab switches every row above back on, the poster included.
+The headline, the title and — for a series request — the requested seasons are not switchable: they are
+what makes the message a notification rather than a fact sheet.
+
+Only the two media messages have sections to switch. Approvals, declines, failures and every `ISSUE_*`
+message are a headline and a sentence, and the Admin Info block appended to an admin's copy is governed
+per-event by `routing`, not here.
 
 ### The Seerr API key is readable in `setup`
 

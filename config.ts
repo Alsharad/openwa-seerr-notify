@@ -5,6 +5,8 @@
 // load, but defaults nested under `items`/`properties` are NOT — so the per-row user fields below are
 // defaulted in code rather than trusted to arrive.
 
+import { readContent } from './content.ts';
+import type { ContentFlags } from './content.ts';
 import { identityFor, readRoster, rosterIndex } from './roster.ts';
 import type { RosterEntry } from './roster.ts';
 import { readRouting } from './routing.ts';
@@ -19,24 +21,6 @@ export interface SeerrUser {
   email: string;
   username: string;
   isAdmin: boolean;
-}
-
-/**
- * Which sections a Now Available message renders. Every one is ON and there is no operator switch: nine
- * toggles for one message type was more configuration surface than the decision deserved. The type and
- * the formatter's branches are kept — they are what the formatter tests exercise per section — but the
- * only value ever constructed is {@link ALL_SECTIONS}.
- */
-export interface MediaAvailableFlags {
-  showReleaseDate: boolean;
-  showRatings: boolean;
-  showOverview: boolean;
-  showGenres: boolean;
-  showDirector: boolean;
-  showCast: boolean;
-  showTrailer: boolean;
-  showSeasons: boolean;
-  showCollection: boolean;
 }
 
 /** The Seerr connection alone, readable without a recipient list — see readSeerrConnection. */
@@ -60,21 +44,10 @@ export interface SeerrConfig {
   /** Per-event delivery rules, defaulted from DEFAULT_ROUTING. */
   routing: RoutingTable;
   sendPoster: boolean;
-  flags: MediaAvailableFlags;
+  /** Which sections a media notification renders, defaulted from DEFAULT_CONTENT. */
+  content: ContentFlags;
   debug: boolean;
 }
-
-export const ALL_SECTIONS: MediaAvailableFlags = {
-  showReleaseDate: true,
-  showRatings: true,
-  showOverview: true,
-  showGenres: true,
-  showDirector: true,
-  showCast: true,
-  showTrailer: true,
-  showSeasons: true,
-  showCollection: true,
-};
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 const bool = (v: unknown, fallback: boolean): boolean => {
@@ -183,7 +156,7 @@ export function readConfig(raw: Record<string, unknown>): SeerrConfig {
     roster,
     routing: readRouting(raw.routing),
     sendPoster: bool(raw.sendPoster, true),
-    flags: ALL_SECTIONS,
+    content: readContent(raw.content),
     debug: bool(raw.debug, false),
   };
 }

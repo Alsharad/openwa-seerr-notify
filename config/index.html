@@ -314,6 +314,7 @@
   <button role="tab" id="tab-connection" aria-controls="panel-connection" aria-selected="true">Connection</button>
   <button role="tab" id="tab-recipients" aria-controls="panel-recipients" aria-selected="false">Recipients</button>
   <button role="tab" id="tab-routing" aria-controls="panel-routing" aria-selected="false">Who gets what</button>
+  <button role="tab" id="tab-content" aria-controls="panel-content" aria-selected="false">Message content</button>
   <button role="tab" id="tab-options" aria-controls="panel-options" aria-selected="false">Options</button>
   <button role="tab" id="tab-setup" aria-controls="panel-setup" aria-selected="false">Setup</button>
 </div>
@@ -415,17 +416,32 @@
   </div>
 </section>
 
+<section id="panel-content" role="tabpanel" aria-labelledby="tab-content" tabindex="0" hidden>
+  <h2>Message content</h2>
+  <p class="lede">What goes into Now Available and Request Submitted messages.</p>
+
+  <div class="card" id="contentCard">
+    <div class="card-head">
+      <h3>Sections</h3>
+      <button type="button" class="btn" id="contentReset">Reset to defaults</button>
+    </div>
+    <label class="switch" for="sendPoster">
+      <input type="checkbox" id="sendPoster" name="sendPoster" />
+      <span class="txt">
+        <b>Poster</b>
+        <small>Artwork, above the text.</small>
+      </span>
+    </label>
+    <p class="hint" id="contentHint" style="margin-top:10px">
+      A section is left out when Seerr has nothing for it, whatever this says.
+    </p>
+  </div>
+</section>
+
 <section id="panel-options" role="tabpanel" aria-labelledby="tab-options" tabindex="0" hidden>
   <h2>Options</h2>
 
   <div class="card">
-    <label class="switch" for="sendPoster">
-      <input type="checkbox" id="sendPoster" name="sendPoster" />
-      <span class="txt">
-        <b>Send the poster</b>
-        <small>Artwork with each notification.</small>
-      </span>
-    </label>
     <label class="switch" for="requireMappedUser">
       <input type="checkbox" id="requireMappedUser" name="requireMappedUser" />
       <span class="txt">
@@ -440,8 +456,6 @@
         <small>Extra detail in the gateway log. Never message contents.</small>
       </span>
     </label>
-  </div>
-
   </div>
 
   <div class="card">
@@ -790,6 +804,62 @@
     setStatus('Reset to defaults. Save to keep it.', true);
   }
 
+  // ── Message content ─────────────────────────────────────────────────────
+  // Mirrors CONTENT_SECTIONS in content.ts. config-ui.test.ts parses this block and fails if the two
+  // disagree, so the editor can neither offer a switch the formatter never reads nor hide one it does.
+  var CONTENT_SECTIONS = [
+    { key: 'showOverview',    label: 'Plot summary' },
+    { key: 'showRating',      label: 'Rating',       note: 'IMDb or Rotten Tomatoes, whichever Seerr has.' },
+    { key: 'showRuntime',     label: 'Runtime' },
+    { key: 'showReleaseDate', label: 'Release date' },
+    { key: 'showGenres',      label: 'Genres' },
+    { key: 'showCast',        label: 'Cast',         note: 'Top five billed.' },
+    { key: 'showDirector',    label: 'Director',     note: 'The creator, for a series.' },
+    { key: 'showTrailer',     label: 'Trailer link', note: 'YouTube, when Seerr has one.' },
+    { key: 'showSeasons',     label: 'Season list',  note: 'Series only.' },
+    { key: 'showCollection',  label: 'Collection',   note: 'Movies only.' }
+  ];
+
+  // Built once, not on every render: a checkbox holds its own state, so flipping one needs no repaint —
+  // unlike a routing cell, whose ✓/— face has to be redrawn. Same .switch component as the Options tab.
+  (function buildContentSwitches() {
+    var card = el('contentCard');
+    CONTENT_SECTIONS.forEach(function (section) {
+      var label = document.createElement('label');
+      label.className = 'switch';
+      label.setAttribute('for', section.key);
+
+      var box = document.createElement('input');
+      box.type = 'checkbox';
+      box.id = section.key;
+      box.name = section.key;
+
+      var txt = document.createElement('span');
+      txt.className = 'txt';
+      var name = document.createElement('b');
+      name.textContent = section.label;
+      txt.appendChild(name);
+      if (section.note) {
+        var note = document.createElement('small');
+        note.textContent = section.note;
+        txt.appendChild(note);
+      }
+
+      label.appendChild(box);
+      label.appendChild(txt);
+      // Before the hint, not appended: the hint is the card's closing line on every other tab too.
+      card.insertBefore(label, el('contentHint'));
+    });
+  })();
+
+  function resetContent() {
+    CONTENT_SECTIONS.forEach(function (section) { el(section.key).checked = true; });
+    // Not a CONTENT_SECTIONS row — the poster is its own top-level key — but it is a switch in this
+    // card, and a Reset that skipped one switch in the card it sits in would read as a bug.
+    el('sendPoster').checked = true;
+    setStatus('Reset to defaults. Save to keep it.', true);
+  }
+
   // ── Recipients ──────────────────────────────────────────────────────────
   // One row per Seerr account, from the roster the plugin caches in config. A row whose id is absent
   // from the roster is still rendered — the account was deleted, or the roster has never been fetched —
@@ -1061,6 +1131,13 @@
     });
     renderRouting();
 
+    // No `content` key at all is what an install upgraded from 1.20 or earlier looks like, and it was
+    // running with every section on — so absent means on, here and in readContent.
+    var sections = cfg.content && typeof cfg.content === 'object' ? cfg.content : {};
+    CONTENT_SECTIONS.forEach(function (section) {
+      el(section.key).checked = typeof sections[section.key] === 'boolean' ? sections[section.key] : true;
+    });
+
     var mappings = Array.isArray(cfg.users) ? cfg.users : [];
     var byId = {};
     mappings.forEach(function (m) {
@@ -1102,6 +1179,8 @@
     cfg.rosterSyncedAt = rosterSyncedAt;
     cfg.rosterRefreshRequestedAt = refreshToken;
     cfg.routing = routing;
+    cfg.content = {};
+    CONTENT_SECTIONS.forEach(function (section) { cfg.content[section.key] = el(section.key).checked; });
     cfg.setup = setup;
     cfg.setupRequestedAt = setupToken;
     return cfg;
@@ -1198,6 +1277,7 @@
   });
   refreshBtn.addEventListener('click', requestRefresh);
   el('routingReset').addEventListener('click', resetRouting);
+  el('contentReset').addEventListener('click', resetContent);
 
   /** One reveal behaviour, used by both credential fields — they are the same control. */
   function bindReveal(buttonId, fieldId, noun) {
