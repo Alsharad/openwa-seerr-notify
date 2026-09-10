@@ -66,15 +66,13 @@ test('every folder imports only in the allowed direction', () => {
   assert.deepEqual(violations, []);
 });
 
-test('the layout the README draws is the layout on disk', () => {
-  const readme = readFileSync(join(ROOT, 'README.md'), 'utf8');
+test('every folder on disk has a declared direction', () => {
+  // A new folder that nobody added to ALLOWED would be unconstrained — the rule above would skip it
+  // silently rather than fail. This is what makes adding a folder a deliberate act.
   const onDisk = readdirSync(SRC, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
 
   assert.deepEqual(onDisk, Object.keys(ALLOWED).filter((name) => name !== '.').sort());
-  for (const folder of onDisk) {
-    assert.match(readme, new RegExp(`^\\s*${folder}/`, 'm'), `the README layout omits src/${folder}`);
-  }
 });

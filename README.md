@@ -72,18 +72,6 @@ until a notification quietly arrives bare. Everything else the check knows — a
 recent delivery failures — is reported in the message but never flips the verdict. An unfinished setup is
 not a fault, and a badge that goes red for one teaches you to ignore it.
 
-### Why the work is backgrounded
-
-The host dispatches an ingress handler with a **5 second** budget and does **not** cancel the work when
-that expires — it records the delivery as failed while the handler keeps running. This notification does
-up to three Seerr API calls and then one poster upload per recipient, and the host budgets a *single*
-media send at 120 s. Awaiting that inside the handler would produce a false dispatch failure, and a
-redrive of it would re-run a handler that had already sent — delivering the notification twice.
-
-The trade is explicit: the host's ingress retry and dead-letter machinery no longer covers delivery,
-because the handler has already returned successfully by the time a send can fail. Retries and dead
-letters are owned by the plugin instead.
-
 ## Setup
 
 Most of this is done for you by the **Setup** tab (the last tab on the config screen). It shows the
@@ -176,12 +164,6 @@ as well as the process environment, so `docker inspect` showing no such variable
 unset. The health check is the reliable answer: if it reports the Seerr version, the guard is letting
 the call through.
 
-**Why `net.allow` is `["*"]`** and not a host list: the host only auto-admits a config URL through
-`net.allowConfigHosts` when it is **https** (OpenWA's own `plugin-net.ts`, `effectiveNetAllow`), and a
-self-hosted Seerr almost never is. With a fixed list, every such install fails with `Plugin seerr-notify
-may not fetch …` and the only fix is unzipping the package to edit the manifest. The real gate stays
-where the operator can reach it — the SSRF guard above.
-
 ## Install
 
 Download `seerr-notify.zip` from [Releases](https://github.com/Alsharad/openwa-seerr-notify/releases),
@@ -211,7 +193,7 @@ OpenWA's remote catalog, which a side-loaded plugin is not. The endpoint that do
 which uninstall-then-install does not:
 
 ```bash
-# The sha256 is on the release page, next to the zip.
+# The sha256 is GitHub's own asset digest — see below.
 curl -X POST http://<openwa-host>:<openwa-port>/api/plugins/seerr-notify/update \
   -H "X-API-Key: <ADMIN_KEY>" -H 'Content-Type: application/json' \
   -d '{"url":"https://github.com/Alsharad/openwa-seerr-notify/releases/download/v<VERSION>/seerr-notify.zip#sha256=<SHA256>"}'
@@ -222,7 +204,17 @@ default in some deployments) refuses an unpinned URL outright:
 
 > installing from a URL requires an integrity pin in this deployment: append `#sha256=<64 hex>` to the URL
 
-Every release ships `seerr-notify.zip.sha256` alongside the zip for exactly this.
+The hash to use is the one GitHub records for the asset itself:
+
+```bash
+gh release view v<VERSION> --repo Alsharad/openwa-seerr-notify \
+  --json assets --jq '.assets[].digest | sub("^sha256:";"")'
+```
+
+(GitHub reports it as `sha256:<hex>`; the URL fragment wants the bare hex, which is what the `sub`
+strips.)
+
+The plugin's own **Install it** button reads that same digest, which is why it needs no hash from you.
 
 ### Updates
 
@@ -247,19 +239,12 @@ the second press and every one after it is answered `200 duplicate` and never re
 dedup is doing real work — it is what stops a crash-recovery replay or a DLQ redrive from messaging
 people twice — so the answer is a better test rig, not weaker dedup.
 
-```bash
-export SEERR_INGRESS_TOKEN=<instance secret>
-export INGRESS_URL=http://<openwa-host>:<openwa-port>/api/ingress/seerr-notify/seerr-prod/seerr
+**Configure → Setup → Send a test message** is the rig. It does not go through ingress at all, so there
+is nothing to deduplicate and it can be pressed as often as you like. It runs the real delivery path —
+session resolution, recipient routing, formatting, retrying send — and reports which chats it reached.
 
-node scripts/send-test.mjs --list                        # every event type
-node scripts/send-test.mjs                               # TEST_NOTIFICATION (admins)
-node scripts/send-test.mjs MEDIA_AVAILABLE --as alice    # poster + enrichment, to a requester
-node scripts/send-test.mjs ISSUE_COMMENT --as alice
-```
-
-Each run carries a `_nonce`, so it is always a fresh delivery and never deduplicated. `--as` is the
-Seerr username or email the event comes from; it must match a mapped, enabled recipient, since every
-event except `TEST_NOTIFICATION` is routed to its requester or reporter by default.
+It is routed like a real `TEST_NOTIFICATION`, so it goes to admins. If nobody you have ticked on
+**Recipients** is a Seerr admin, it will tell you that rather than fail silently.
 
 ### When a notification can be silently dropped
 
@@ -295,61 +280,13 @@ header for `dedupHeader` to key on. The fix belongs in the host: a per-route opt
 Note that the key includes `instanceId`, so renaming or recreating an ingress instance starts a fresh
 de-duplication window.
 
-### Layout
-
-```
-src/
-  index.ts        the plugin object the host loads: lifecycle, ingress, health
-  settings/       operator config — parsing, defaults, validation
-                    config.ts  content.ts  routing.ts  roster.ts
-  seerr/          talking to Seerr, and reading what it sends
-                    seerr-client.ts  normalize.ts  probe.ts
-  notify/         turning an event into messages and delivering them
-                    handler.ts  formatter.ts  recipients.ts
-                    deliver.ts  deadletter.ts
-  panel/          what the settings panel's buttons trigger
-                    setup.ts  update-check.ts  test-send.ts  roster-refresh.ts
-  host/           the OpenWA gateway itself
-                    gateway.ts  session-resolve.ts
-  types/          host type declarations
-scripts/          build.mjs  zip-store.mjs  refresh-roster.mjs  send-test.mjs
-config/index.html the settings panel, shipped as-is inside the zip
-```
-
-Tests sit beside what they test — `src/notify/formatter.test.ts` covers `src/notify/formatter.ts`.
-
-Dependencies run one way, with no cycles: `index.ts` → `panel/` → `notify/` → `settings/` + `seerr/`.
-`settings/` imports nothing outside itself, `seerr/` reaches only the host type declarations, and
-`host/` sits at the bottom importing nothing at all. `src/layout.test.ts` fails the build if that stops
-being true, so the diagram above cannot quietly go stale.
-
-### Build from source
-
-```bash
-npm ci
-npm run check      # typecheck + tests + package
-```
-
-`npm run build` writes `seerr-notify.zip`. The packaging step is a gate, not just a bundler: it refuses
-to build when `manifest.json`, `package.json` and the top released CHANGELOG heading disagree on the
-version, when `manifest.main` is missing from the archive, or when the result exceeds OpenWA's 5 MB
-install limit.
-
-Releases are built and published by hand: `npm run check`, then `gh release create v<x.y.z>` with the
-zip attached. `npm run check` passing locally is the gate, and there is no CI badge above because there
-is no CI.
-
-`.github/workflows/ci.yml` would have done both on a tag push, and is kept for reference, but it is
-**disabled**. This repository's Actions are billing-locked, so every run failed in seconds without
-executing a single step — a red cross on code that passes, once per push. Re-enabling it needs two
-fixes first: it attaches a `.sha256` sidecar nothing reads (the in-panel updater pins its download to
-`assets[].digest`, which GitHub computes itself), and its release job would overwrite hand-written
-release notes with generated ones.
-
 ## Configuration
 
 Everything here is edited from the plugin's own config screen (Configure on the Plugins page). The keys
 are listed because they are what the REST API and any backup will show you.
+
+The panel's own copy is deliberately short — a label, and at most one line under it where the label
+cannot carry the meaning. This page is where the detail lives.
 
 | Key | Required | Default | Description |
 | --- | -------- | ------- | ----------- |
@@ -388,9 +325,10 @@ between "not available" and "not wanted".
 | `showSeasons` | A **Seasons** block | Series only. Per-season availability; the specials bucket is never listed |
 | `showCollection` | `🎬 Part of: …` | Movies only |
 
-`showRating` and `showRuntime` share one line when both are on. Everything else is its own line or block.
-**Reset to defaults** on that tab switches every row above back on, the poster included.
-The headline, the title and — for a series request — the requested seasons are not switchable: they are
+`showRating` and `showRuntime` share one line when both are on; everything else is its own line or
+block. **Reset to defaults** switches every row above back on, the poster included.
+
+The headline, the title and — for a series request — the requested seasons are not switchable. They are
 what makes the message a notification rather than a fact sheet.
 
 Only the two media messages have sections to switch. Approvals, declines, failures and every `ISSUE_*`
@@ -407,17 +345,9 @@ empty box.
 What it costs: an ADMIN, unscoped API key reading `GET /plugins` sees the value in the clear. Everything
 that can read it could already do more than read it — that key class can rewrite the config or uninstall
 the plugin — and Seerr stores its own copy in the clear regardless. If you would rather it did not,
-delete `mirrorSeerrKey` from `index.ts`; the field falls back to an empty box that still saves correctly.
+delete `mirrorSeerrKey` from `src/index.ts`; the field falls back to an empty box that still saves correctly.
 
 The **ingress secret is not stored here at all** — OpenWA's Instances tab owns it.
-
-Every **Now Available** section — overview, rating, runtime, genres, director/creator, top cast, trailer,
-seasons, collection — is always on. These were nine separate toggles until v1.2.0; that was more
-configuration surface than the decision deserved, and the panel stopped mentioning them in v1.9.1 for
-the same reason: a list of things you cannot change is not a setting.
-
-The panel's own copy is deliberately short — a label, and at most one line where the label cannot carry
-it. This table is where the detail lives.
 
 ## Compatibility
 
@@ -434,8 +364,8 @@ it. This table is where the detail lives.
   **pressing Test Notification twice** produces exactly this, and looks like the plugin ignoring you.
 - **Retry behaviour depends on your queue.** With `QUEUE_ENABLED=false` (OpenWA's default) ingress
   dispatches inline with a single attempt. It does not matter much here: the plugin backgrounds its own
-  delivery, so the host's retry would not have covered the sends anyway. See **Why the work is
-  backgrounded**.
+  delivery, so the host's retry would not have covered the sends anyway — retries and dead letters are
+  the plugin's own.
 - **`TEST_NOTIFICATION` goes to admins only**, by default. If no notified recipient is a Seerr admin, a
   test reaches nobody and is recorded as `no_recipients`, which the health check reports.
 - **The Refresh button needs the gateway's key file.** It reads `/app/data/.api-key` to write the roster
@@ -489,14 +419,14 @@ restart. Nothing is cached across deliveries.
   baked into the manifest **at build time** — never from config, so no config write can redirect it — and
   it is pinned to the sha256 GitHub publishes for the asset itself (`assets[].digest`), so the hash is
   neither computed from the downloaded bytes nor transcribed by hand. A release whose asset carries no
-  digest is refused. If you would rather this did not exist, delete `installUpdate` from `setup.ts`; the check
+  digest is refused. If you would rather this did not exist, delete `installUpdate` from `src/panel/setup.ts`; the check
   and the banner keep working, and `Options → Check GitHub` switches off the check entirely.
 - **⚠️ The Refresh button and the Setup tab step outside the plugin capability model.** Nothing in the
   supported surface lets a plugin write its own config: the editor is an opaque-origin sandbox with no
   network whose only channel speaks `config:get` / `config:save`, and `PluginContext.config` is a
   read-only getter. The only writer is `PUT /api/plugins/:id/config`, which requires an ADMIN, unscoped
   key. So the plugin reads the gateway's own key from `/app/data/.api-key` and calls that endpoint —
-  `gateway.ts` is the whole of it. Specifically:
+  `src/host/gateway.ts` is the whole of it. Specifically:
   - the key is read at call time, **never copied into config**, never logged, and never leaves the process;
   - the self-call is **loopback-only** and uses Node's `fetch`, not `ctx.net.fetch` — widening
     `SSRF_ALLOWED_HOSTS` to admit `127.0.0.1` would open loopback to *every* plugin on the host;
@@ -511,9 +441,10 @@ restart. Nothing is cached across deliveries.
   token is cleared rather than echoed — a stale `secret|…` left in config would otherwise rotate your
   ingress secret again after an unrelated restart.
 
-  If you would rather no plugin on your host could do this, delete `gateway.ts`, `setup.ts`,
-  `roster-refresh.ts` and the `onConfigChange` handler in `index.ts`, and use `scripts/refresh-roster.mjs`, which
-  takes the key from the environment of whoever runs it. You lose the Setup tab and the update banner;
+  If you would rather no plugin on your host could do this, delete `src/host/gateway.ts`,
+  `src/panel/setup.ts`, `src/panel/roster-refresh.ts` and the `onConfigChange` handler in
+  `src/index.ts`, and use `scripts/refresh-roster.mjs`, which takes the key from the environment of
+  whoever runs it. You lose the Setup tab and the update banner;
   everything on the delivery path works unchanged.
 
 ## Changelog

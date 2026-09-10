@@ -6,6 +6,20 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+### Documentation
+
+- **The README is strictly operator-facing now.** Everything that only matters while editing the source
+  — the directory layout, the build and release commands, the host constraints that cost real debugging
+  time, why delivery is backgrounded, the `scripts/` test rigs — moved into an untracked `CLAUDE.md`.
+  What stayed is what someone running the plugin needs: setup, install, upgrade, configuration,
+  compatibility and the full security disclosure, including the source pointers for opting out of the
+  privileged bits.
+
+- Two claims in it had gone stale and are corrected. It still said every **Now Available** section was
+  always on and could not be switched off, which v1.21.0 made false. It also said every release ships a
+  `seerr-notify.zip.sha256` sidecar; releases have shipped the zip alone since v1.18.0, so the upgrade
+  instructions now read the pin from GitHub's own asset digest instead.
+
 ### Changed
 
 - **The repository is organized into folders.** Thirty-nine files sat in the root, which made finding
