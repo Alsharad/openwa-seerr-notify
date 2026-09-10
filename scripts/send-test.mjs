@@ -15,10 +15,10 @@
 // hash without changing a single character of the message.
 //
 // Usage:
-//   SEERR_INGRESS_TOKEN=<secret> node send-test.mjs                              # TEST_NOTIFICATION
-//   SEERR_INGRESS_TOKEN=<secret> node send-test.mjs MEDIA_AVAILABLE --as alice    # the rich one
-//   SEERR_INGRESS_TOKEN=<secret> node send-test.mjs ISSUE_COMMENT --as alice
-//   node send-test.mjs --list
+//   SEERR_INGRESS_TOKEN=<secret> node scripts/send-test.mjs                             # TEST_NOTIFICATION
+//   SEERR_INGRESS_TOKEN=<secret> node scripts/send-test.mjs MEDIA_AVAILABLE --as alice   # the rich one
+//   SEERR_INGRESS_TOKEN=<secret> node scripts/send-test.mjs ISSUE_COMMENT --as alice
+//   node scripts/send-test.mjs --list
 //
 // `--as` sets who the event is FROM — the requester on MEDIA_*, the reporter on ISSUE_*. It must be the
 // Seerr username or email of a mapped, enabled recipient, or the plugin resolves no recipients and

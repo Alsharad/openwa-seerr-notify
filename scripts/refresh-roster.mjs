@@ -9,7 +9,7 @@
 // Deliberately manual: it runs when you run it, never on a timer.
 //
 // Usage:
-//   SEERR_API_KEY=... node refresh-roster.mjs
+//   SEERR_API_KEY=... node scripts/refresh-roster.mjs
 //
 // Environment:
 //   SEERR_API_KEY   required — Seerr API key (the copy in plugin config reads back masked, so it
